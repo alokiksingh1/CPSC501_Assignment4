@@ -20,7 +20,7 @@ void readWaveFileHeader(WavHeader *header, FILE *inputFile);
 void readTone(char *sampleTone, char *impulseTone);
 float bytesToFloat(char firstByte, char secondByte); 
 
-// struct to hold all data up until the end of subchunk2
+// struct to hold all data up until the end of subchunk1
 typedef struct {
     char chunk_ID[4];           // "RIFF"
     int chunk_Size;             // Size of the entire file in bytes minus 8 bytes
@@ -33,31 +33,12 @@ typedef struct {
     int byteRate;              // == SampleRate * NumChannels * BitsPerSample/8
     short blockAlign;          // == NumChannels * BitsPerSample/8
     short bitsPerSample;       // 8 bits = 8, 16 bits = 16, etc.
-    char subchunk2_ID[4];       // "data"
-    int subchunk2_Size;         // == NumSamples * NumChannels * BitsPerSample/8
 } WavHeader;
 
 
 
 // read wavefileheader
 // function for reading headers from input files
-
-// void readWaveFileHeader(WavHeader *header, FILE *inputFile){
-//     fread(header -> chunk_ID, sizeof(header -> chunk_Size), 1, inputFile);
-//     fread(&header->chunk_Size, sizeof(header->chunk_Size), 1, inputFile);
-//     fread(header->format, sizeof(header->format), 1, inputFile);
-//     fread(header->subchunk1_ID, sizeof(header->subchunk1_ID), 1, inputFile);
-//     fread(&header->subchunk1_Size, sizeof(header->subchunk1_Size), 1, inputFile);
-//     fread(&header->audioFormat, sizeof(header->audioFormat), 1, inputFile);
-//     fread(&header->numChannels, sizeof(header->numChannels), 1, inputFile);
-//     fread(&header->sampleRate, sizeof(header->sampleRate), 1, inputFile);
-//     fread(&header->byteRate, sizeof(header->byteRate), 1, inputFile);
-//     fread(&header->blockAlign, sizeof(header->blockAlign), 1, inputFile);
-//     fread(&header->bitsPerSample, sizeof(header->bitsPerSample), 1, inputFile);
-//     fread(header->subchunk2_ID, sizeof(header->subchunk2_ID), 1, inputFile);
-//     fread(&header->subchunk2_Size, sizeof(header->subchunk2_Size), 1, inputFile);
-
-// }
 
 void rreadWaveFileHeader(WavHeader *header, FILE *inputFile){
     fread(header, sizeof(WavHeader), 1, inputFile);
@@ -166,25 +147,46 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
     
+    fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
+    // now let's calculate frequency and duration of the input .wav file
+    // we need to use the formula: frequency = 1 / (duration / numberOfSamples)
+    // we need to use the formula: duration = numberOfSamples / frequency
+    // we need to use the formula: numberOfSamples = duration * SAMPLE_RATE
+
+    // subchunk2_Size chunk size
+    int subchunk2_Size;
+    fread(&subchunk2_Size, 4, 1, inputFile);
+    int chunkSize = 36 + subchunk2_Size;
+    
+    // find duration
+    double duration = chunkSize / SAMPLE_RATE;
+
+    // find number of samples
+    int numberOfSamples = duration * SAMPLE_RATE;
+
+    double Frequency = 1 / (duration / numberOfSamples);
+
 
     WavHeader inputHeader, IRheader;
     readWaveFileHeader(&inputHeader, inputFile);
     readWaveFileHeader(&IRheader, IRfile);
 
-    
-    int outputSize = IRheader.subchunk2_Size * inputHeader.chunk_Size;
+
+    int outputSize = subchunk2_Size * inputHeader.chunk_Size;
     float *x , *y, *h = calloc(outputSize, sizeof(float));
 
-    convolve(x, )
+    convolve(x, subchunk2_Size, y, IRheader.chunk_Size, h, outputSize);
 
     
 
 
     int numChannels =inputHeader.numChannels;
-    int NumSamples = inputHeader.subchunk2_Size/(inputHeader.bitsPerSample/8);
+    int NumSamples = subchunk2_Size/(inputHeader.bitsPerSample/8);
     int outputRate = inputHeader.sampleRate;
     int bitsPerSample = inputHeader.bitsPerSample;
     writeWaveFileHeader(numChannels, NumSamples, outputRate , bitsPerSample, outputFile);
+
+    fwrite(h, sizeof(float), outputSize, outputFile);
 
     fclose(inputFile);
     fclose(outputFile);
@@ -193,7 +195,7 @@ int main(int argc, char *argv[]) {
     clear(inputHeader);
     clear(outputFile);
 
-    free();
+    free(h);
     return 0;
 }
 
