@@ -5,9 +5,6 @@
 /*  CONSTANTS  ***************************************************************/
 #define PI                3.14159265358979
 
-/*  Test tone frequency in Hz  */
-#define FREQUENCY         440.0
-
 /*  Standard sample rate in Hz  */
 #define SAMPLE_RATE       44100.0
 
