@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 
 /*  CONSTANTS  ***************************************************************/
@@ -10,12 +11,6 @@
 
 /*  Number of channels  */
 #define MONOPHONIC        1
-
-// function definition
-void convolve(float x[], int N, float h[], int M, float y[], int P);
-void readWaveFileHeader(WavHeader *header, FILE *inputFile);
-void readTone(char *sampleTone, char *impulseTone);
-float bytesToFloat(char firstByte, char secondByte); 
 
 // struct to hold all data up until the end of subchunk1
 typedef struct {
@@ -32,15 +27,19 @@ typedef struct {
     short bitsPerSample;       // 8 bits = 8, 16 bits = 16, etc.
 } WavHeader;
 
+// function definition
+void convolve(float x[], int N, float h[], int M, float y[], int P);
+void readWaveFileHeader(WavHeader *header, FILE *inputFile);
+void readTone(char *sampleTone, char *impulseTone, char *outputTone);
+float bytesToFloat(char firstByte, char secondByte);
+size_t fwriteShortLSB(short int data, FILE *stream);
+size_t fwriteIntLSB(int data, FILE *stream);
 
 
-// read wavefileheader
-// function for reading headers from input files
 
-void rreadWaveFileHeader(WavHeader *header, FILE *inputFile){
-    fread(header, sizeof(WavHeader), 1, inputFile);
-    // fread(header, sizeof(header), 1, inputFile);
-}
+
+
+
 
 
 // Function to convert two bytes to one float in the range -1 to 1
@@ -76,7 +75,7 @@ void writeWaveFileHeader(int channels, int numberSamples,
     fputs("RIFF", outputFile);
       
     /*  Form size  */
-    fwriteIntLSB(formSize, outputFile);
+    //fwriteIntLSB(formSize, outputFile);
       
     /*  Form container type  */
     fputs("WAVE", outputFile);
@@ -86,63 +85,60 @@ void writeWaveFileHeader(int channels, int numberSamples,
       
     /*  Format chunk size (chunk_Size)  */
     
-    fwriteIntLSB(16, outputFile);
+    //fwriteIntLSB(16, outputFile);
 
     /*  Compression code:  1 = PCM  */
-    fwriteShortLSB(1, outputFile);
+    //fwriteShortLSB(1, outputFile);
 
     /*  Number of channels  */
-    fwriteShortLSB((short)channels, outputFile);
+    //fwriteShortLSB((short)channels, outputFile);
 
     /*  Output Sample Rate  */
-    fwriteIntLSB((int)outputRate, outputFile);
+    //fwriteIntLSB((int)outputRate, outputFile);
 
     /*  Bytes per second  */
-    fwriteIntLSB(bytesPerSecond, outputFile);
+    //fwriteIntLSB(bytesPerSecond, outputFile);
 
     /*  Block alignment (frame size)  */
-    fwriteShortLSB(frameSize, outputFile);
+    //fwriteShortLSB(frameSize, outputFile);
 
     /*  Bits per sample  */
-    fwriteShortLSB(bitsPerSample, outputFile);
+    unsigned char array[5];
+    array[0] = (unsigned char)(bitsPerSample);
+    array[1] = (unsigned char)(dataChunkSize);
+    array[2] = (unsigned char)(bytesPerSecond);
+    array[3] = (unsigned char)((int)outputRate);
+    array[4] = (unsigned char)((short)channels);
+    fwrite(array, 1, sizeof(unsigned char), outputFile);
 
     /*  Sound Data chunk identifier  */
     fputs("data", outputFile);
 
     /*  Chunk size  */
-    fwriteIntLSB(dataChunkSize, outputFile);
+    //fwriteIntLSB(dataChunkSize, outputFile);
 }
 
 
 
 int main(int argc, char *argv[]) {
     
+    char *inputFile, *IRfile, outputFile;
 
     if (argc != 4){
-        printf("Usage : %s \t3 arguments required: (input .wav file) (IR file) (output file)\n", argv[0]);
+        printf(stderr, "Usage : %s \t3 arguments required: (input file) (IR file) (output file)\n", argv[0]);
     }
 
-    FILE *inputFile = fopen(argv[1], "rb");
-    FILE *IRfile = fopen(argv[2], "rb");
-    FILE *outputFile = fopen(argv[3], "wb");
+    if (argc == 4){
+        inputFile = argv[1];
+        IRfile = argv[2];
+        outputFile = argv[3];
+
+    }
+
     
+    readTone(inputFile, IRfile, outputFile);
 
-    if (inputFile == NULL){
-        printf("Couldn't load input file, Error!!\n");
-        perror("");
-        exit(-1);
-    }
-    if (IRfile == NULL){
-        printf("Couldn't load IR file, Error!!\n");
-        perror("");
-        exit(-1);
-    }
-    if (outputFile == NULL){
-        printf("Couldn't load ouput file, Error!!\n");
-        perror("");
-        fclose(inputFile);
-        exit(-1);
-    }
+    
     
     fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
     // now let's calculate frequency and duration of the input .wav file
@@ -163,42 +159,63 @@ int main(int argc, char *argv[]) {
 
     double Frequency = 1 / (duration / numberOfSamples);
 
+    // **********************************************************************
+
+    // now similarly, let's calculate for IR file as well
+
+    fscanf(IRfile, "%s", IRfile); // fscanf is used to read the input file
+    
+    // subchunk2_Size chunk size
+    int IR_subchunk2_Size;
+    fread(&IR_subchunk2_Size, 4, 1, IRfile);
+    int IR_chunkSize = 36 + IR_subchunk2_Size;
+    
+    // find duration
+    double IR_duration = IR_chunkSize / SAMPLE_RATE;
+
+    // find number of samples
+    int IR_numberOfSamples = IR_duration * SAMPLE_RATE;
+
+    double IR_Frequency = 1 / (IR_duration / IR_numberOfSamples);
+
 
     WavHeader inputHeader, IRheader;
-    readWaveFileHeader(&inputHeader, inputFile);
-    readWaveFileHeader(&IRheader, IRfile);
+    // read header subchunk 1
+    fread(&inputHeader, sizeof(inputHeader), 1, inputFile);
+    fread(&IRheader, sizeof(IRheader), 1, IRfile);
 
 
-    int outputSize = subchunk2_Size * inputHeader.chunk_Size;
-    float *x , *y, *h = calloc(outputSize, sizeof(float));
+    int outputSize = subchunk2_Size * IR_subchunk2_Size;
+    float *x , *y, *h = malloc(outputSize);
+    // *h = calloc(outputSize, sizeof(float));
 
-    convolve(x, subchunk2_Size, y, IRheader.chunk_Size, h, outputSize);
+    convolve(x, subchunk2_Size, y, IR_subchunk2_Size, h, outputSize);
 
     
 
 
     int numChannels =inputHeader.numChannels;
-    int NumSamples = subchunk2_Size/(inputHeader.bitsPerSample/8);
     int outputRate = inputHeader.sampleRate;
     int bitsPerSample = inputHeader.bitsPerSample;
+    int NumSamples = subchunk2_Size/(bitsPerSample/8);
+    
     writeWaveFileHeader(numChannels, NumSamples, outputRate , bitsPerSample, outputFile);
 
+    int IR_numChannels =IRheader.numChannels;
+    int IR_outputRate = IRheader.sampleRate;
+    int IR_bitsPerSample = IRheader.bitsPerSample;
+    int IR_NumSamples = IR_subchunk2_Size/(IR_bitsPerSample/8);
+    
+    // writeWaveFileHeader(IR_numChannels, IR_NumSamples, IR_outputRate , IR_bitsPerSample, outputFile);
     fwrite(h, sizeof(float), outputSize, outputFile);
 
     fclose(inputFile);
     fclose(outputFile);
     fclose(IRfile);
 
-    clear(inputHeader);
-    clear(outputFile);
-
     free(h);
     return 0;
 }
-
-
-
-
 
 
 // function to convolve x[n](Input) with h[n](IR) to produce y[n](Output)
@@ -221,37 +238,26 @@ void convolve(float x[], int N, float y[], int M, float h[], int P){
 }
 
 
-/*      purpose:        Writes a 4-byte integer to the file stream, starting
-*                       with the least significant byte (i.e. writes the int
-*                       in little-endian form).  This routine will work on both
-*                       big-endian and little-endian architectures.
-*/
+void readTone(char *sampleTone, char *impulseTone, char *outputTone){
+    FILE *inputFile = fopen(sampleTone, "rb");
+    FILE *IRfile = fopen(impulseTone, "rb");
+    FILE *outputFile = fopen(outputTone, "wb");
 
-size_t fwriteIntLSB(int data, FILE *stream)
-{
-    unsigned char array[4];
+    if (inputFile == NULL){
+        printf("Couldn't load input file, Error!!\n");
+        perror("");
+        exit(-1);
+    }
+    if (IRfile == NULL){
+        printf("Couldn't load IR file, Error!!\n");
+        perror("");
+        exit(-1);
+    }
+    if (outputFile == NULL){
+        printf("Couldn't load ouput file, Error!!\n");
+        perror("");
+        fclose(inputFile);
+        exit(-1);
+    }
 
-    array[3] = (unsigned char)((data >> 24) & 0xFF);
-    array[2] = (unsigned char)((data >> 16) & 0xFF);
-    array[1] = (unsigned char)((data >> 8) & 0xFF);
-    array[0] = (unsigned char)(data & 0xFF);
-    return fwrite(array, sizeof(unsigned char), 4, stream);
-}
-
-
-
-
-/*       purpose:       Writes a 2-byte integer to the file stream, starting
-*                       with the least significant byte (i.e. writes the int
-*                       in little-endian form).  This routine will work on both
-*                       big-endian and little-endian architectures.
-*/
-
-size_t fwriteShortLSB(short int data, FILE *stream)
-{
-    unsigned char array[2];
-
-    array[1] = (unsigned char)((data >> 8) & 0xFF);
-    array[0] = (unsigned char)(data & 0xFF);
-    return fwrite(array, sizeof(unsigned char), 2, stream);
 }
