@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 
     
     readTone(inputFile, IRfile, outputFile);
-
+    
     
     
     fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
     // find number of samples
     int numberOfSamples = duration * SAMPLE_RATE;
-
+    
     double Frequency = 1 / (duration / numberOfSamples);
 
     // **********************************************************************
