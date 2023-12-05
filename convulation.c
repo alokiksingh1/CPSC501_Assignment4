@@ -138,82 +138,6 @@ int main(int argc, char *argv[]) {
     
     readTone(inputFile, IRfile, outputFile);
     
-    
-    
-    fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
-    // now let's calculate frequency and duration of the input .wav file
-    // we need to use the formula: frequency = 1 / (duration / numberOfSamples)
-    // we need to use the formula: duration = numberOfSamples / frequency
-    // we need to use the formula: numberOfSamples = duration * SAMPLE_RATE
-
-    // subchunk2_Size chunk size
-    int subchunk2_Size;
-    fread(&subchunk2_Size, 4, 1, inputFile);
-    int chunkSize = 36 + subchunk2_Size;
-    
-    // find duration
-    double duration = chunkSize / SAMPLE_RATE;
-
-    // find number of samples
-    int numberOfSamples = duration * SAMPLE_RATE;
-    
-    double Frequency = 1 / (duration / numberOfSamples);
-
-    // **********************************************************************
-
-    // now similarly, let's calculate for IR file as well
-
-    fscanf(IRfile, "%s", IRfile); // fscanf is used to read the input file
-    
-    // subchunk2_Size chunk size
-    int IR_subchunk2_Size;
-    fread(&IR_subchunk2_Size, 4, 1, IRfile);
-    int IR_chunkSize = 36 + IR_subchunk2_Size;
-    
-    // find duration
-    double IR_duration = IR_chunkSize / SAMPLE_RATE;
-
-    // find number of samples
-    int IR_numberOfSamples = IR_duration * SAMPLE_RATE;
-
-    double IR_Frequency = 1 / (IR_duration / IR_numberOfSamples);
-
-
-    WavHeader inputHeader, IRheader;
-    // read header subchunk 1
-    fread(&inputHeader, sizeof(inputHeader), 1, inputFile);
-    fread(&IRheader, sizeof(IRheader), 1, IRfile);
-
-
-    int outputSize = subchunk2_Size * IR_subchunk2_Size;
-    float *x , *y, *h = malloc(outputSize);
-    // *h = calloc(outputSize, sizeof(float));
-
-    convolve(x, subchunk2_Size, y, IR_subchunk2_Size, h, outputSize);
-
-    
-
-
-    int numChannels =inputHeader.numChannels;
-    int outputRate = inputHeader.sampleRate;
-    int bitsPerSample = inputHeader.bitsPerSample;
-    int NumSamples = subchunk2_Size/(bitsPerSample/8);
-    
-    writeWaveFileHeader(numChannels, NumSamples, outputRate , bitsPerSample, outputFile);
-
-    int IR_numChannels =IRheader.numChannels;
-    int IR_outputRate = IRheader.sampleRate;
-    int IR_bitsPerSample = IRheader.bitsPerSample;
-    int IR_NumSamples = IR_subchunk2_Size/(IR_bitsPerSample/8);
-    
-    // writeWaveFileHeader(IR_numChannels, IR_NumSamples, IR_outputRate , IR_bitsPerSample, outputFile);
-    fwrite(h, sizeof(float), outputSize, outputFile);
-
-    fclose(inputFile);
-    fclose(outputFile);
-    fclose(IRfile);
-
-    free(h);
     return 0;
 }
 
@@ -259,5 +183,89 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         fclose(inputFile);
         exit(-1);
     }
+
+    
+    
+    fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
+    
+    // frequency = 1 / (duration / numberOfSamples)
+    // duration = numberOfSamples / frequency
+    // numberOfSamples = duration * SAMPLE_RATE
+
+    // subchunk2_Size chunk size
+    int subchunk2_Size;
+    fread(&subchunk2_Size, 4, 1, inputFile);
+    int chunkSize = 36 + subchunk2_Size;
+    
+    // find duration
+    double duration = chunkSize / SAMPLE_RATE;
+
+    // find number of samples
+    int numberOfSamples = duration * SAMPLE_RATE;
+    
+    double Frequency = 1 / (duration / numberOfSamples);
+
+    fscanf(IRfile, "%s", IRfile); // fscanf to read IR file
+    
+    // IR's subchunk2_Size chunk size
+    int IR_subchunk2_Size;
+    fread(&IR_subchunk2_Size, 4, 1, IRfile);
+    int IR_chunkSize = 36 + IR_subchunk2_Size;
+    
+    // find duration
+    double IR_duration = IR_chunkSize / SAMPLE_RATE;
+
+    // find number of samples
+    int IR_numberOfSamples = IR_duration * SAMPLE_RATE;
+
+    double IR_Frequency = 1 / (IR_duration / IR_numberOfSamples);
+
+
+    WavHeader inputHeader, IRheader;
+    // read header subchunk 1
+    fread(&inputHeader, sizeof(inputHeader), 1, inputFile);
+    fread(&IRheader, sizeof(IRheader), 1, IRfile);
+
+
+    /*
+    Let's print out some header values
+    */
+    printf("audio format : %s\n", inputHeader.format);
+    printf("number of channels : %s\n", inputHeader.numChannels);
+    printf("size of subchunk1 : %s\n", inputHeader.subchunk1_Size);
+    printf("\n***************************************************\n");
+    printf("IR audio format : %s\n", IRheader.format);
+    printf("IR number of channels : %s\n", IRheader.numChannels);
+    printf("IR size of subchunk1 : %s\n", IRheader.subchunk1_Size);
+
+    int outputSize = subchunk2_Size * IR_subchunk2_Size;
+    float *x , *y, *h = malloc(outputSize);
+    // *h = calloc(outputSize, sizeof(float));
+
+    convolve(x, subchunk2_Size, y, IR_subchunk2_Size, h, outputSize);
+
+    
+
+
+    int numChannels =inputHeader.numChannels;
+    int outputRate = inputHeader.sampleRate;
+    int bitsPerSample = inputHeader.bitsPerSample;
+    int NumSamples = subchunk2_Size/(bitsPerSample/8);
+    
+    writeWaveFileHeader(numChannels, NumSamples, outputRate , bitsPerSample, outputFile);
+
+    int IR_numChannels =IRheader.numChannels;
+    int IR_outputRate = IRheader.sampleRate;
+    int IR_bitsPerSample = IRheader.bitsPerSample;
+    int IR_NumSamples = IR_subchunk2_Size/(IR_bitsPerSample/8);
+    
+    // writeWaveFileHeader(IR_numChannels, IR_NumSamples, IR_outputRate , IR_bitsPerSample, outputFile);
+    fwrite(h, sizeof(float), outputSize, outputFile);
+
+    fclose(inputFile);
+    fclose(outputFile);
+    fclose(IRfile);
+
+    free(h);
 
 }
