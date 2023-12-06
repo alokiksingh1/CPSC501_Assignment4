@@ -30,18 +30,11 @@ typedef struct {
 // function definition
 void convolve(float x[], int N, float h[], int M, float y[], int P);
 // void readWaveFileHeader(WavHeader *header, FILE *inputFile);
-void readTone(char *sampleTone, char *impulseTone, char *outputTone);
 float bytesToFloat(char firstByte, char secondByte);
+void readTone(char *sampleTone, char *impulseTone, char *outputTone);
 size_t fwriteShortLSB(short int data, FILE *stream);
 size_t fwriteIntLSB(int data, FILE *stream);
-void writeWavFile(char *fileName, WavHeader *header, float *data, int size);
-
-
-
-
-
-
-
+void writeWaveFileHeader(int channels, int numberSamples, double outputRate, int bitsPerSample,  FILE *outputFile);
 
 // Function to convert two bytes to one float in the range -1 to 1
 // This is used as .wav files store data in short format (typically 16 bits, can also be extracted from the bits_per_sample header)
@@ -54,11 +47,13 @@ float bytesToFloat(char firstByte, char secondByte) {
 }
 
 
+
+
 // Writing the header in WAVE format to the output file.
-void writeWaveFileHeader(int channels, int numberSamples,
-                         double outputRate, int bitsPerSample,  FILE *outputFile)
+void writeWaveFileHeader(int channels, int numberSamples, double outputRate, int bitsPerSample,  FILE *outputFile)
 {
     /*  Calculate the total number of bytes for the data chunk  */
+    int BYTES_PER_SAMPLE = bitsPerSample/8;
     int dataChunkSize = channels * numberSamples * BYTES_PER_SAMPLE;
 	
     /*  Calculate the total number of bytes for the form size  */
@@ -111,14 +106,14 @@ void writeWaveFileHeader(int channels, int numberSamples,
     fwriteIntLSB(dataChunkSize, outputFile);
       
 
-    /*  Bits per sample  */
-    unsigned char array[5];
-    array[0] = (unsigned char)(bitsPerSample);
-    array[1] = (unsigned char)(dataChunkSize);
-    array[2] = (unsigned char)(bytesPerSecond);
-    array[3] = (unsigned char)((int)outputRate);
-    array[4] = (unsigned char)((short)channels);
-    fwrite(array, 1, sizeof(unsigned char), outputFile);
+    // /*  Bits per sample  */
+    // unsigned char array[5];
+    // array[0] = (unsigned char)(bitsPerSample);
+    // array[1] = (unsigned char)(dataChunkSize);
+    // array[2] = (unsigned char)(bytesPerSecond);
+    // array[3] = (unsigned char)((int)outputRate);
+    // array[4] = (unsigned char)((short)channels);
+    // fwrite(array, 1, sizeof(unsigned char), outputFile);
     fputs("data", outputFile);
 
 }
@@ -130,16 +125,13 @@ int main(int argc, char *argv[]) {
     char *inputFile, *IRfile, outputFile;
 
     if (argc != 4){
-        printf(stderr, "Usage : %s \t3 arguments required: (input file) (IR file) (output file)\n", argv[0]);
+        fprintf(stderr, "Usage : %s \t3 arguments required: (input file) (IR file) (output file)\n", argv[0]);
     }
 
-    if (argc == 4){
-        inputFile = argv[1];
-        IRfile = argv[2];
-        outputFile = argv[3];
-    }
+    inputFile = argv[1];
+    IRfile = argv[2];
+    outputFile = argv[3];
 
-    
     readTone(inputFile, IRfile, outputFile);
     
     return 0;
@@ -189,13 +181,13 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     }
 
     
-    
+   
     // fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
     // fscanf(IRfile, "%s", IRfile); // fscanf to read IR file
     WavHeader inputHeader, IRheader;
     // read header subchunk 1
-    fread(&inputHeader, sizeof(inputHeader), 1, inputFile);
-    fread(&IRheader, sizeof(IRheader), 1, IRfile);
+    fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
+    fread(&IRheader, sizeof(WavHeader), 1, IRfile);
 
     if (inputHeader.subchunk1_Size != 16){
         // eliminate null bytes
@@ -244,14 +236,38 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
      printf("IR number of samples : %s\n", num_impulse);
 
     int outputSize = num_samples + num_impulse - 1;
-    float *x , *y;
+    float *x = (float*)malloc(num_samples * sizeof(float));
+    float *y = (float*)malloc(num_impulse * sizeof(float));
     float *h = (float*)malloc(outputSize * sizeof(float));
     // *h = calloc(outputSize, sizeof(float));
+    if (!x || !y || !h) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        if (x) free(x);
+        if (y) free(y);
+        if (h) free(h);
+        // Close any opened files here as well
+        fclose(inputFile);
+        fclose(IRfile);
+        fclose(outputFile);
+        exit(-1);
+    }
 
-    convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
 
-    
+    for (int i = 0; i < num_samples; ++i) {
+        char buffer[2];
+        fread(buffer, sizeof(char), 2, inputFile);
+        x[i] = bytesToFloat(buffer[0], buffer[1]);
+    }
 
+    for (int i = 0; i < num_impulse; ++i) {
+        char buffer[2];
+        fread(buffer, sizeof(char), 2, IRfile);
+        y[i] = bytesToFloat(buffer[0], buffer[1]);
+    }
+
+    // convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
+
+    convolve(x, num_samples, h, num_impulse, y, outputSize);
 
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
@@ -265,10 +281,17 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     int IR_bitsPerSample = IRheader.bitsPerSample;
     int IR_NumSamples = subchunk2_size_impulse/(IR_bitsPerSample/8);
     
-    // writeWaveFileHeader(IR_numChannels, IR_NumSamples, IR_outputRate , IR_bitsPerSample, outputFile);
+    
     //fwrite(h, sizeof(float), outputSize, outputFile);
+    fwrite(h, outputSize, 1, outputFile);
 
-    writeWavFile(outputFile, &inputHeader, y, sizeof(float));
+    writeWaveFileHeader(num_samples, num_impulse, IR_outputRate , IR_bitsPerSample, outputFile);
+
+    for (int i = 0; i < outputSize; ++i) {
+        // Convert h[i] from float to short
+        short sample = (short)(h[i] * 32768.0);
+        fwrite(&sample, sizeof(short), 1, outputFile);
+    }
 
     fclose(inputFile);
     fclose(outputFile);
