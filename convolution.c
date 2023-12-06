@@ -262,10 +262,6 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         h[i] /= maxVal;
     }
 
-        
-
-    }
-
     // Check for division by zero because h/maxVal cannot afford maxVal to be 0
     
     // Normalize h to range -1 to 1
