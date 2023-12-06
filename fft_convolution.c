@@ -30,45 +30,62 @@ typedef struct {
     int byteRate;              // == SampleRate * NumChannels * BitsPerSample/8
     short blockAlign;          // == NumChannels * BitsPerSample/8
     short bitsPerSample;       // 8 bits = 8, 16 bits = 16, etc.
+    char subChunk2ID[4];
+    int subChunk2Size;
+
+    char* dataArray;
+    short* signal;
+    int signalSize;
 } WavHeader;
 
 void writeWAVHeader(int numChannels, int numSamples, int outputRate, int bitsPerSample, FILE *outputFile){
 
-    //calculations for header fields
+    /*  Calculate the total number of bytes for the data chunk  */
+    int BYTES_PER_SAMPLE = bitsPerSample/8;
+    int dataChunkSize = numChannels * numSamples * BYTES_PER_SAMPLE;
+	
+    int formSize = 36 + dataChunkSize;
+    short int frameSize = numChannels * BYTES_PER_SAMPLE;
+    int bytesPerSecond = (int)ceil(outputRate * frameSize);
 
-    //subchunk sizes
-    int BytesPerSample = bitsPerSample/8;
-    int dataChunkSize = numChannels * numSamples * BytesPerSample; 
-    int formSize = 36 + dataChunkSize; //36 is sum of all field sizes before data
-    
-    //number of bytes for one sample after accounting all channels (frame size)
-    short frameSize = numChannels * BytesPerSample;
-    
-    //bytes per second  = sample rate * total bytes per sample
-    int byteRate = (int) outputRate * frameSize;
-
-    //write header to file
-    //use fputs for big endian fields, use respective LSB methods for little endian
-
-    //RIFF chunk descriptor
+  
     fputs("RIFF", outputFile);
     fwriteIntLSB(formSize, outputFile);
     fputs("WAVE", outputFile);
-    
 
-    fputs("fmt ", outputFile);
-    fwriteIntLSB(16, outputFile); 
+    fputs("fmt ", outputFile);  
+    fwriteIntLSB(16, outputFile);
     fwriteShortLSB(1, outputFile);
     fwriteShortLSB((short)numChannels, outputFile);
     fwriteIntLSB(outputRate, outputFile);
-    fwriteIntLSB(byteRate, outputFile);
+    fwriteIntLSB(bytesPerSecond, outputFile);
     fwriteShortLSB(frameSize, outputFile);
     fwriteShortLSB(bitsPerSample, outputFile);
 
     fputs("data", outputFile);
     fwriteIntLSB(dataChunkSize, outputFile);
-
 }
+
+size_t fwriteIntLSB(int data, FILE *stream)
+{
+    unsigned char array[4];
+
+    array[3] = (unsigned char)((data >> 24) & 0xFF);
+    array[2] = (unsigned char)((data >> 16) & 0xFF);
+    array[1] = (unsigned char)((data >> 8) & 0xFF);
+    array[0] = (unsigned char)(data & 0xFF);
+    return fwrite(array, sizeof(unsigned char), 4, stream);
+}
+
+size_t fwriteShortLSB(short int data, FILE *stream)
+{
+    unsigned char array[2];
+
+    array[1] = (unsigned char)((data >> 8) & 0xFF);
+    array[0] = (unsigned char)(data & 0xFF);
+    return fwrite(array, sizeof(unsigned char), 2, stream);
+}
+
 
 
 
@@ -180,7 +197,71 @@ int main (int argc, char *argv[]){
     return 0;
 }
 
-int readWavFile(char* sampleTone, char* impulseTone, char*outputTone ){
+void readWav(const char *filename, double **data, int *length) {
+
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+
+    WavHeader header;
+    fread(&header, sizeof(WavHeader), 1, file);
+
+    // Read the audio data
+    // ... (Depends on the format specified in the header)
+    
+    fclose(file);
+}
+void readWav(const char *filename, double **data, int *length) {
+    FILE *file = fopen(filename, "rb");
+    if (!file) {
+        perror("Error opening file");
+        exit(1);
+    }
+
+    // Read the header
+    WavHeader header;
+    fread(&header, sizeof(WavHeader), 1, file);
+
+    // Ensure the WAV file is of the expected format
+    if (header.audioFormat != 1 || header.numChannels != 1 || header.bitsPerSample != 16) {
+        fprintf(stderr, "Unsupported WAV format\n");
+        fclose(file);
+        exit(1);
+    }
+
+    // Calculate the number of samples
+    *length = header.subChunk2Size / (header.numChannels * (header.bitsPerSample / 8));
+
+    // Allocate memory for the audio data
+    *data = (double *)malloc(*length * sizeof(double));
+    if (*data == NULL) {
+        perror("Error allocating memory for audio data");
+        fclose(file);
+        exit(1);
+    }
+
+    // Read the audio data and convert to floating point
+    for (int i = 0; i < *length; ++i) {
+        short sample;
+        if (fread(&sample, sizeof(short), 1, file) < 1) {
+            perror("Error reading audio data");
+            free(*data);
+            fclose(file);
+            exit(1);
+        }
+        // Normalize 16-bit PCM data to [-1.0, 1.0]
+        (*data)[i] = sample / 32767.0;
+    }
+
+    fclose(file);
+}
+
+
+
+int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
     FILE *inputFile = fopen(sampleTone, "rb");
     FILE *IRfile = fopen(impulseTone, "rb");
     FILE *outputFile = fopen(outputTone, "wb");
@@ -202,88 +283,71 @@ int readWavFile(char* sampleTone, char* impulseTone, char*outputTone ){
         exit(-1);
     }
 
-    WavHeader inputHeader, IRheader;
-    // read header subchunk 1
-    fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
-    fread(&IRheader, sizeof(WavHeader), 1, IRfile);
+    // Read WAV files
+    double *inputSignal, *IRsignal;
+    int inputLength, IRlength;
+    readWav(sampleTone, &inputSignal, &inputLength);
+    readWav(impulseTone, &IRsignal, &IRlength);
 
-
-
-}
-int convolveTone(float x[], int N, float y[], int M, float h[], int P){
-
-    // Example usage
-    int inputLength = sizeof(x);
-    int IRlength = sizeof(y);
-    int M = inputLength + IRlength - 1; // Length of x
-    int K = next_power_of_2(2*M);
-    double *inputSignal = (double *)calloc(K*2, sizeof(double));
-    double *IRsignal = (double *)calloc(K , sizeof(double));
+    // Pad signals to the next power of 2
+    int M = inputLength + IRlength - 1; 
+    int K = next_power_of_2(M);
+    // int K = next_power_of_2(2*M);
+    double *x = (double *)calloc(K*2, sizeof(double));
+    double *h = (double *)calloc(K*2, sizeof(double));
 
     for(int i=0; i< 2*M; i++)
     {
         x[i] = 0.0;
     }
-    // sample array pass instead of x
-    x[0] = 1.0;
-    x[2] = 2.0;
-    x[4] = 3.0;
-    x[6] = 4.0;
-    x[8] = 5.0;
-    //double x[] = {1.0, 0, 2.0, 0, 3.0, 0, 4.0, 0, 5.0, 0};
 
-    int N = 3; // Length of h
-    double *h = (double *)calloc(K*2, sizeof(double));
-    //double h[] = {0.5, 0, 0.5, 0};
+    int N = sizeof(h);
 
     for(int i=0; i< 2*N; i++)
     {
         h[i] = 0.0;
     }
-    // impulse array
-    h[0] = 0.5;
-    h[1] = 0.0;
-    h[2] = 0.5;
-    h[3] = 0.0;
-    h[4] = 1.0;
-    h[5] = 0.0;
-    // Calculate the output size
-   
-    printf("k: %d \n", K);
+
+        // pad zeros
     pad_zeros_to(x, 2*M, K*2);
     pad_zeros_to(h, 2*N, K*2);
 
-
+    // FFT
     four1(x-1, K, 1);
     four1(h-1, K, 1);
 
-    double y[K*2];
-    // Perform convolution in frequency domain
+    // Convolution
+    double *y = (double *)calloc(K*2, sizeof(double));
     convolution(x, K, h, y);
-    //  for (int i = 0; i < 2 * K; ++i) {
-    //     printf("%f ", y[i]);
-    // }
-        
 
-printf("\n ");
- //int u = K;
+    // Inverse FFT
     four1(y-1, K, -1);
-    
-  
 
     for(int k = 0, i=0; k<M+N-1; k++, i += 2)
     {
         y[i] /= (double)K;
         y[i+1] /= (double)K;
     }
-    printf("\n Result: \n");
+
     for (int i = 0; i < 2*K; i=i+2) {
         printf("%f ", y[i]);
     }
+    // Write to output WAV file
+    writeWaveFileHeader(&inputHeader, outputFile);
+    fwrite(y, sizeof(double), K, outputFile);
 
-    //free(y);
+    // Clean up
+    fclose(inputFile);
+    fclose(IRfile);
+    fclose(outputFile);
+    free(x);
+    free(h);
+    free(y);
 
     return 0;
 }
-// extracting real part into imaginary array
+        
+    
+
+//  now extract real part into imaginary array, imaginary part will be 0. calculate properly
 

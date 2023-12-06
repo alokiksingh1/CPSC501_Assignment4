@@ -234,24 +234,34 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     convolve(x, num_samples, y, num_impulse, h, outputSize);
 
+
     float maxVal = 0.0;
 
+    // Find the maximum absolute value in the array
     for (int i = 0; i < outputSize; i++) {
         if (fabsf(h[i]) > maxVal) {
             maxVal = fabsf(h[i]);
-            if (maxVal == 0) {
-                fprintf(stderr, "Error: MaxVal cannot be 0\n");
-                // Free memory and close files
-                free(x); 
-                free(y); 
-                free(h);
-                fclose(inputFile); 
-                fclose(outputFile); 
-                fclose(IRfile);
-                exit(-1);
-            }
         }
+    }
+
+    // Check if maxVal is zero to avoid division by zero
+    if (maxVal == 0) {
+        fprintf(stderr, "Error: MaxVal cannot be 0\n");
+        // Free memory and close files
+        free(x); 
+        free(y); 
+        free(h);
+        fclose(inputFile); 
+        fclose(outputFile); 
+        fclose(IRfile);
+        exit(-1);
+    }
+
+    // Normalize the array by dividing each element by maxVal
+    for (int i = 0; i < outputSize; i++) {
         h[i] /= maxVal;
+    }
+
         
 
     }
