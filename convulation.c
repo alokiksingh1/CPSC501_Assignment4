@@ -268,9 +268,9 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         y[i] = bytesToFloat(buffer[0], buffer[1]);
     }
 
-    convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
+    //convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
 
-    // convolve(x, num_samples, h, num_impulse, y, outputSize);
+    convolve(x, num_samples, h, num_impulse, y, outputSize);
 
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
@@ -285,11 +285,13 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     int IR_NumSamples = subchunk2_size_impulse/(IR_bitsPerSample/8);
     
     
+    
+
+    writeWaveFileHeader(num_samples, num_impulse, outputSize , bitsPerSample, outputFile);
+
     //fwrite(h, sizeof(float), outputSize, outputFile);
     fwrite(h, outputSize, 1, outputFile);
-
-    writeWaveFileHeader(num_samples, num_impulse, IR_outputRate , IR_bitsPerSample, outputFile);
-
+    
     for (int i = 0; i < outputSize; ++i) {
         // Convert h[i] from float to short
         short sample = (short)(h[i] * 32768.0);
@@ -325,3 +327,4 @@ size_t fwriteShortLSB(short int data, FILE *stream)
     array[0] = (unsigned char)(data & 0xFF);
     return fwrite(array, sizeof(unsigned char), 2, stream);
 }
+
