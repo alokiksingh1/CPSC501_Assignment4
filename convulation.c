@@ -272,6 +272,32 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     convolve(x, num_samples, h, num_impulse, y, outputSize);
 
+    float maxVal = 0.0;
+
+    for (int i = 0; i < outputSize; i++) {
+        if (fabs(h[i]) > maxVal) {
+            maxVal = fabs(h[i]);
+        }
+    }
+
+    // Check for division by zero because h/maxVal cannot afford maxVal to be 0
+    if (maxVal == 0) {
+        fprintf(stderr, "Error: Maximum value in output is zero, normalization not possible.\n");
+        // Free memory and close files
+        free(x); 
+        free(y); 
+        free(h);
+        fclose(inputFile); 
+        fclose(outputFile); 
+        fclose(IRfile);
+        exit(-1);
+    }
+
+    // Normalize h to range -1 to 1
+    for (int i = 0; i < outputSize; i++) {
+        h[i] /= maxVal;
+    }
+
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
     int bitsPerSample = inputHeader.bitsPerSample;
@@ -279,23 +305,18 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     
     //writeWaveFileHeader(numChannels, NumSamples, outputRate , bitsPerSample, outputFile);
 
-    int IR_numChannels =IRheader.numChannels;
-    int IR_outputRate = IRheader.sampleRate;
-    int IR_bitsPerSample = IRheader.bitsPerSample;
-    int IR_NumSamples = subchunk2_size_impulse/(IR_bitsPerSample/8);
-    
-    
     
 
-    writeWaveFileHeader(num_samples, num_impulse, outputSize , bitsPerSample, outputFile);
+    writeWaveFileHeader(numChannels, outputSize, outputRate , bitsPerSample, outputFile);
 
     //fwrite(h, sizeof(float), outputSize, outputFile);
     fwrite(h, outputSize, 1, outputFile);
+
     
     for (int i = 0; i < outputSize; ++i) {
         // Convert h[i] from float to short
-        short sample = (short)(h[i] * 32768.0);
-        fwrite(&sample, sizeof(short), 1, outputFile);
+        short s = (short)(h[i] * 32768.0);
+        fwrite(&s, sizeof(short), 1, outputFile);
     }
 
     fclose(inputFile);
