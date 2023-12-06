@@ -50,71 +50,33 @@ float bytesToFloat(char firstByte, char secondByte) {
 
 
 // Writing the header in WAVE format to the output file.
-void writeWaveFileHeader(int channels, int numberSamples, double outputRate, int bitsPerSample,  FILE *outputFile)
+void writeWaveFileHeader(int numChannels, int numberSamples, double outputRate, int bitsPerSample,  FILE *outputFile)
 {
     /*  Calculate the total number of bytes for the data chunk  */
     int BYTES_PER_SAMPLE = bitsPerSample/8;
-    int dataChunkSize = channels * numberSamples * BYTES_PER_SAMPLE;
+    int dataChunkSize = numChannels * numberSamples * BYTES_PER_SAMPLE;
 	
-    /*  Calculate the total number of bytes for the form size  */
     int formSize = 36 + dataChunkSize;
-	
-    /*  Calculate the total number of bytes per frame  */
-    short int frameSize = channels * BYTES_PER_SAMPLE;
-	
-    /*  Calculate the byte rate  */
+    short int frameSize = numChannels * BYTES_PER_SAMPLE;
     int bytesPerSecond = (int)ceil(outputRate * frameSize);
 
-    /*  Write header to file  */
-    /*  Form container identifier  */
+  
     fputs("RIFF", outputFile);
-      
-    /*  Form size  */
     fwriteIntLSB(formSize, outputFile);
-      
-    /*  Form container type  */
     fputs("WAVE", outputFile);
 
-    /*  Format chunk identifier (Note: space after 't' needed)  */
-    fputs("fmt ", outputFile);
-      
-    /*  Format chunk size (fixed at 16 bytes)  */
+    fputs("fmt ", outputFile);  
     fwriteIntLSB(16, outputFile);
-
-    /*  Compression code:  1 = PCM  */
     fwriteShortLSB(1, outputFile);
-
-    /*  Number of channels  */
-    fwriteShortLSB((short)channels, outputFile);
-
-    /*  Output Sample Rate  */
-    fwriteIntLSB((int)outputRate, outputFile);
-
-    /*  Bytes per second  */
+    fwriteShortLSB((short)numChannels, outputFile);
+    fwriteIntLSB(outputRate, outputFile);
     fwriteIntLSB(bytesPerSecond, outputFile);
-
-    /*  Block alignment (frame size)  */
     fwriteShortLSB(frameSize, outputFile);
-
-    /*  Bits per sample  */
     fwriteShortLSB(bitsPerSample, outputFile);
 
-    /*  Sound Data chunk identifier  */
     fputs("data", outputFile);
-
-    /*  Chunk size  */
     fwriteIntLSB(dataChunkSize, outputFile);
-      
 
-    // /*  Bits per sample  */
-    // unsigned char array[5];
-    // array[0] = (unsigned char)(bitsPerSample);
-    // array[1] = (unsigned char)(dataChunkSize);
-    // array[2] = (unsigned char)(bytesPerSecond);
-    // array[3] = (unsigned char)((int)outputRate);
-    // array[4] = (unsigned char)((short)channels);
-    // fwrite(array, 1, sizeof(unsigned char), outputFile);
-    fputs("data", outputFile);
 
 }
 
