@@ -122,7 +122,7 @@ void writeWaveFileHeader(int channels, int numberSamples, double outputRate, int
 
 int main(int argc, char *argv[]) {
     
-    char *inputFile, *IRfile, outputFile;
+    char *inputFile, *IRfile, *outputFile;
 
     if (argc != 4){
         fprintf(stderr, "Usage : %s \t3 arguments required: (input file) (IR file) (output file)\n", argv[0]);
@@ -226,14 +226,14 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     Let's print out some header values
     */
     printf("audio format : %s\n", inputHeader.format);
-    printf("number of channels : %s\n", inputHeader.numChannels);
-    printf("size of subchunk1 : %s\n", inputHeader.subchunk1_Size);
-    printf("number of samples : %s\n", num_samples);
+    printf("number of channels : %hd\n", inputHeader.numChannels);
+    printf("size of subchunk1 : %d\n", inputHeader.subchunk1_Size);
+    printf("number of samples : %d\n", num_samples);
     printf("\n***************************************************\n");
     printf("IR audio format : %s\n", IRheader.format);
-    printf("IR number of channels : %s\n", IRheader.numChannels);
-    printf("IR size of subchunk1 : %s\n", IRheader.subchunk1_Size);
-     printf("IR number of samples : %s\n", num_impulse);
+    printf("IR number of channels : %hd\n", IRheader.numChannels);
+    printf("IR size of subchunk1 : %d\n", IRheader.subchunk1_Size);
+     printf("IR number of samples : %d\n", num_impulse);
 
     int outputSize = num_samples + num_impulse - 1;
     float *x = (float*)malloc(num_samples * sizeof(float));
@@ -252,6 +252,9 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         exit(-1);
     }
 
+    float Array [outputSize];
+
+
 
     for (int i = 0; i < num_samples; ++i) {
         char buffer[2];
@@ -265,9 +268,9 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         y[i] = bytesToFloat(buffer[0], buffer[1]);
     }
 
-    // convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
+    convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
 
-    convolve(x, num_samples, h, num_impulse, y, outputSize);
+    // convolve(x, num_samples, h, num_impulse, y, outputSize);
 
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
