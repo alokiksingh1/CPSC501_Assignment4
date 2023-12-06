@@ -144,14 +144,14 @@ void convolve(float x[], int N, float y[], int M, float h[], int P){
 
     /* Clear Output Buffer y[] */
     for (n = 0; n < P; n++)
-        y[n] = 0.0;
+        h[n] = 0.0;
     
     // outer loop:  for each input vale x[n] to be processed in turn
     for (n = 0; n < N; n++){
         // inner loop: for all x[n] to be processed with impulse sample h[n]
         for (m = 0; m < M; m++){
             // here * means multiply
-            y[n + m] += x[n] * h[m];
+            h[n + m] += x[n] * y[m];
             
         }
     }
@@ -229,17 +229,19 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     printf("number of channels : %hd\n", inputHeader.numChannels);
     printf("size of subchunk1 : %d\n", inputHeader.subchunk1_Size);
     printf("number of samples : %d\n", num_samples);
-    printf("\n***************************************************\n");
+    printf("\n***************************************************\n\n");
     printf("IR audio format : %s\n", IRheader.format);
     printf("IR number of channels : %hd\n", IRheader.numChannels);
     printf("IR size of subchunk1 : %d\n", IRheader.subchunk1_Size);
      printf("IR number of samples : %d\n", num_impulse);
 
     int outputSize = num_samples + num_impulse - 1;
+
+    // Allocate and initialize memory for x, y, and h
     float *x = (float*)malloc(num_samples * sizeof(float));
     float *y = (float*)malloc(num_impulse * sizeof(float));
     float *h = (float*)malloc(outputSize * sizeof(float));
-    // *h = calloc(outputSize, sizeof(float));
+
     if (!x || !y || !h) {
         fprintf(stderr, "Error: Memory allocation failed\n");
         if (x) free(x);
@@ -251,8 +253,6 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         fclose(outputFile);
         exit(-1);
     }
-
-    float Array [outputSize];
 
 
 
@@ -268,35 +268,38 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         y[i] = bytesToFloat(buffer[0], buffer[1]);
     }
 
-    //convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
+    // convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
 
-    convolve(x, num_samples, h, num_impulse, y, outputSize);
+    convolve(x, num_samples, y, num_impulse, h, outputSize);
 
     float maxVal = 0.0;
 
     for (int i = 0; i < outputSize; i++) {
-        if (fabs(h[i]) > maxVal) {
-            maxVal = fabs(h[i]);
+        if (fabsf(h[i]) > maxVal) {
+            maxVal = fabsf(h[i]);
+            if (maxVal == 0) {
+                fprintf(stderr, "Error: MaxVal cannot be 0\n");
+                // Free memory and close files
+                free(x); 
+                free(y); 
+                free(h);
+                fclose(inputFile); 
+                fclose(outputFile); 
+                fclose(IRfile);
+                exit(-1);
+            }
         }
+        h[i] /= maxVal;
+        
+
     }
 
     // Check for division by zero because h/maxVal cannot afford maxVal to be 0
-    if (maxVal == 0) {
-        fprintf(stderr, "Error: Maximum value in output is zero, normalization not possible.\n");
-        // Free memory and close files
-        free(x); 
-        free(y); 
-        free(h);
-        fclose(inputFile); 
-        fclose(outputFile); 
-        fclose(IRfile);
-        exit(-1);
-    }
-
+    
     // Normalize h to range -1 to 1
-    for (int i = 0; i < outputSize; i++) {
-        h[i] /= maxVal;
-    }
+    // for (int i = 0; i < outputSize; i++) {
+    //     h[i] /= maxVal;
+    // }
 
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
@@ -309,15 +312,16 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     writeWaveFileHeader(numChannels, outputSize, outputRate , bitsPerSample, outputFile);
 
+    for (int i = 0; i < outputSize; ++i) {
+        // Convert h[i] from float to short
+        short int s = (short)rint(h[i] * 32767.0);
+        fwrite(&s, sizeof(short), 1, outputFile);
+    }
     //fwrite(h, sizeof(float), outputSize, outputFile);
     fwrite(h, outputSize, 1, outputFile);
 
     
-    for (int i = 0; i < outputSize; ++i) {
-        // Convert h[i] from float to short
-        short s = (short)(h[i] * 32768.0);
-        fwrite(&s, sizeof(short), 1, outputFile);
-    }
+    
 
     fclose(inputFile);
     fclose(outputFile);
