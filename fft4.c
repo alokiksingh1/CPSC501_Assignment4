@@ -282,9 +282,9 @@ int main(int argc, char *argv[]) {
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);   // K is length of input signal
-  
-    double *inputSignal = (double *)calloc(2 * K , sizeof(double));
-    double *IRsignal = (double *)calloc(2 * K , sizeof(double));
+ 
+    double *inputSignal = (double *)malloc(2 * K * sizeof(double));
+    double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
     
 
@@ -306,11 +306,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < inputLength; i++) {
         inputSignal[2 * i] = inputSignal[i]; // real part
-        inputSignal[2 * i + 1] = 0.0; // imaginary part
+        inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
     }
     for (int i = 0; i < IRlength; i++) {
         IRsignal[2 * i] = IRsignal[i]; // real part
-        IRsignal[2 * i + 1] = 0.0; // imaginary part
+        IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
     }
 
     printf("inputSignal[0]: %f\n", inputSignal[0]);
@@ -325,7 +325,7 @@ int main(int argc, char *argv[]) {
         if (i < inputLength) {
             if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
                 inputSignal[2 * i] = (double)tempSample / 32767.0;
-                // imaginary part is zero by calloc
+                inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
             } else {
                 fprintf(stderr, "Error reading input file\n");
                 fclose(inputFile);
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
         if (i < IRlength) {
             if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
                 IRsignal[2 * i] = (double)tempSample / 32767.0;
-                // imaginary part is zero by calloc
+                IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
             } else {
                 fprintf(stderr, "Error reading IR file\n");
                 fclose(inputFile);
