@@ -1,8 +1,5 @@
-/**
-Author: Kimiya Saadat
-This program will do convolution in frequency domain.
 
-*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -34,7 +31,6 @@ void four1(double data[], int nn, int isign);
 void reverse_array(double *arr, int length);
 int next_power_of_2(int n);
 void convolution(double *x, int K, double *h, double *y) ;
-int readLittleEndianInt(FILE *file);
 
 // Function to pad zeros to the input array to make its length M
 void pad_zeros_to(double *arr, int current_length, int M) {
@@ -221,13 +217,10 @@ int main(int argc, char *argv[]) {
     
     
     // Reading WAV header
-    //size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
-    size_t inputRead = fread(&inputHeader, 1, sizeof(WavHeader) - sizeof(int), inputFile); // Exclude subChunk2Size
-    //inputHeader.subChunk2Size = readLittleEndianInt(inputFile);
-
-    //size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
-    size_t IRread = fread(&IRheader, 1, sizeof(WavHeader) - sizeof(int), IRfile); // Exclude subChunk2Size
-    //IRheader.subChunk2Size = readLittleEndianInt(IRfile);
+    size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
+    size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
+    
+    
 
     if (inputRead < 1 || IRread < 1) {
         perror("Error reading WAV header");
@@ -258,10 +251,7 @@ int main(int argc, char *argv[]) {
     fread(&subchunk2_id_impulse, sizeof(subchunk2_id_impulse), 1, IRfile);
     fread(&subchunk2_size_impulse, sizeof(subchunk2_size_impulse), 1, IRfile);
 
-    int num_samples = subchunk2_size_sample / (inputHeader.bitsPerSample / 8); // number of data points in the sample
-    int num_impulse = subchunk2_size_impulse / (IRheader.bitsPerSample / 8); // number of data points in the impulse
     
-
 
     int inputLength = subchunk2_size_sample / (inputHeader.bitsPerSample / 8);
     int IRlength = subchunk2_size_impulse / (IRheader.bitsPerSample / 8);
@@ -293,17 +283,17 @@ int main(int argc, char *argv[]) {
 
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
-    int K = next_power_of_2(2*M);   // K is length of input signal
+    int K = next_power_of_2(M);   // K is length of input signal
     // int K = next_power_of_2(2*M);
     double *inputSignal = (double *)malloc(2 * K * sizeof(double));
     double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
-    for (int i = 0; i < 2 * K; i++) {
-        inputSignal[i] = 0.0;
-    }
-    for (int i = 0; i < 2 * K; i++) {
-        IRsignal[i] = 0.0;
-    }
+    // for (int i = 0; i < 2 * K; i++) {
+    //     inputSignal[i] = 0.0;
+    // }
+    // for (int i = 0; i < 2 * K; i++) {
+    //     IRsignal[i] = 0.0;
+    // }
 
     printf("K: %d\n", K);
     printf("M: %d\n", M);
@@ -432,69 +422,8 @@ int main(int argc, char *argv[]) {
     return 0;
 }
         
-    
-
-//  now extract real part into imaginary array, imaginary part will be 0. calculate properly
-
-// Temporary buffer for reading samples
-    // short Buffer, IRBuffer;
-    // int sampleCount = 0;
-    // short tempBuffer;
 
 
-    // while (fread(&tempBuffer, sizeof(short), 1, inputFile) == 1){
-    //     while (fread(&tempBuffer, sizeof(short), 1, IRfile) == 1) {
-    //         // Assuming the first half of the file is input signal and the second half is IR
-    //         if (sampleCount < inputLength / 2) {
-    //             (inputSignal)[sampleCount] = (double)tempBuffer;
-    //         } else {
-    //             (IRsignal)[sampleCount - inputLength / 2] = (double)tempBuffer;
-    //         }
-    //         sampleCount++;
-    //     }
-    // }
+   
 
-    // for (int i = 0; i < inputLength; i++) {
 
-    //     if(fread(&Buffer, sizeof(short), 1, inputFile) != 1){
-    //         printf("Error reading input file\n");
-    //         fclose(inputFile);
-    //         fclose(IRfile);
-    //         free(inputSignal);
-    //         free(IRsignal);
-    //         return -1;
-    //     }
-    //     inputSignal[i] = (double)Buffer/32767.0;
-    // }
-    // for (int i = 0; i < IRlength; i++) {
-    //     if(fread(&IRBuffer, sizeof(short), 1, IRfile) != 1){
-    //         printf("Error reading IR file\n");
-    //         fclose(inputFile);
-    //         fclose(IRfile);
-    //         free(inputSignal);
-    //         free(IRsignal);
-    //         return -1;
-    //     }
-    //     IRsignal[i] = (double)IRBuffer/32767.0;
-    // }
-
-// after padzero
-// for(int i=0; i< inputLength; --i)
-    // {
-    //     inputSignal[2*i] = inputSignal[i]; // real part
-    //     inputSignal[2*i + 1] = 0.0; //  imaginary is 0
-    // }
-    
-    // for(int i=0; i< IRlength; --i)
-    // {
-    //     IRsignal[2*i] = IRsignal[i]; // real part
-    //     IRsignal[2*i + 1] = 0.0; //  imaginary is 0
-    // }
-
-int readLittleEndianInt(FILE *file) {
-    unsigned char buffer[4];
-    if (fread(buffer, sizeof(unsigned char), 4, file) != 4) {
-        return -1; // or other error handling
-    }
-    return buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24);
-}
