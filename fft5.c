@@ -1,4 +1,4 @@
-
+// this file also uses compile time optimization, i.e. using constants
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
     
     
     // Reading WAV header
+    
     size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
     size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
     
@@ -281,16 +282,16 @@ int main(int argc, char *argv[]) {
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);   // K is length of input signal
-    // int K = next_power_of_2(2*M);
+
+    double normalization = 32767.0;
+    double inverseofN = 1.0 / (double)normalization;
+
+    double inverseofK = 1.0 / (double)K;
+ 
     double *inputSignal = (double *)malloc(2 * K * sizeof(double));
     double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
-    // for (int i = 0; i < 2 * K; i++) {
-    //     inputSignal[i] = 0.0;
-    // }
-    // for (int i = 0; i < 2 * K; i++) {
-    //     IRsignal[i] = 0.0;
-    // }
+    
 
     printf("K: %d\n", K);
     printf("M: %d\n", M);
@@ -310,49 +311,42 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < inputLength; i++) {
         inputSignal[2 * i] = inputSignal[i]; // real part
-        inputSignal[2 * i + 1] = 0.0; // imaginary part
+        inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
     }
     for (int i = 0; i < IRlength; i++) {
         IRsignal[2 * i] = IRsignal[i]; // real part
-        IRsignal[2 * i + 1] = 0.0; // imaginary part
+        IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
     }
 
     printf("inputSignal[0]: %f\n", inputSignal[0]);
     printf("IRsignal[0]: %f\n", IRsignal[0]);
     // pad zeros
-    short tempSample;
-    for (int i = 0; i < inputLength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
-            inputSignal[2 * i] = (double)tempSample/32767.0;
-            inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading input file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+
+    
+    #define BUFFER_SIZE 1024  // 1 KB buffer
+    short tempSampleBuffer[BUFFER_SIZE];    
+
+    // Reading from inputFile
+    int maxSamples = (inputLength > IRlength) ? inputLength : IRlength;
+    for (int i = 0; i < maxSamples; i += BUFFER_SIZE) {
+        int readCount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, inputFile);
+        for (int j = 0; j < readCount; ++j) {
+            int idx = i + j;
+            if (idx < inputLength) {
+                inputSignal[2 * idx] = (double)tempSampleBuffer[j] * inverseofN;
+            }
         }
-    }
-    for (int i = 0; i < IRlength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
-            IRsignal[2 * i] = (double)tempSample/32767.0;
-            IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading IR file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+        int IRcount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, IRfile);
+        for (int j = 0; j < IRcount; ++j) {
+            int idx = i + j;
+            if (idx < IRlength) {
+                IRsignal[2 * idx] = (double)tempSampleBuffer[j] * inverseofN;
+            }
         }
     }
 
     pad_zeros_to(inputSignal, 2*inputLength, 2*K);
     pad_zeros_to(IRsignal, 2*IRlength, 2*K);
-    
-    
-    
 
     
 
@@ -379,8 +373,8 @@ int main(int argc, char *argv[]) {
 
     for(int i=0; i < M; i++)
     {
-        outputSignal[2*i] /= (double)K; 
-        outputSignal[2*i+1] /= (double)K;
+        outputSignal[2*i] *= inverseofK; 
+        outputSignal[2*i+1] *= inverseofK;
     }
 
 
@@ -404,7 +398,7 @@ int main(int argc, char *argv[]) {
     writeWAVHeader(numChannels, M, outputRate, bitsPerSample , outputFile);
 
     for (int i = 0; i < M; i++) {
-        short int sample = (short int)(outputSignal[2 * i] * 32767.0); // Convert double to 16-bit sample
+        short int sample = (short int)(outputSignal[2 * i] * normalization); // Convert double to 16-bit sample
         fwriteShortLSB(sample, outputFile);
     }
     
@@ -422,9 +416,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-        
-
-
-   
-
-
