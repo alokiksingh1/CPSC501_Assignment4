@@ -8,6 +8,18 @@ This program will do convolution in frequency domain.
 #include <math.h>
 #define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr
 
+// function declaration
+void pad_zeros_to(double *arr, int current_length, int M);
+void writeWAVHeader(int numChannels, int numSamples, int outputRate, int bitsPerSample, FILE *outputFile);
+size_t fwriteShortLSB(short int data, FILE *stream);
+size_t fwriteIntLSB(int data, FILE *stream);
+void four1(double data[], int nn, int isign);
+void reverse_array(double *arr, int length);
+int next_power_of_2(int n);
+void convolution(double *x, int K, double *h, double *y) ;
+void readWav(const char *filename, double **data, int *length);
+int convolveTone(char* sampleTone, char* impulseTone, char* outputTone);
+
 // Function to pad zeros to the input array to make its length M
 void pad_zeros_to(double *arr, int current_length, int M) {
     int padding = M - current_length;
@@ -145,7 +157,6 @@ void four1(double data[], int nn, int isign)
 	}
 	mmax = istep;
     }
-    
 }
 
 // Function to reverse an array
@@ -191,29 +202,13 @@ int main (int argc, char *argv[]){
     IRfile = argv[2];
     outputFile = argv[3];
 
-    readWavFile(inputFile, IRfile, outputFile);
+    convolveTone(inputFile, IRfile, outputFile);
 
     
     return 0;
 }
 
-void readWav(const char *filename, double **data, int *length) {
 
-    FILE *file = fopen(filename, "rb");
-    if (!file) {
-        perror("Error opening file");
-        exit(1);
-    }
-
-
-    WavHeader header;
-    fread(&header, sizeof(WavHeader), 1, file);
-
-    // Read the audio data
-    // ... (Depends on the format specified in the header)
-    
-    fclose(file);
-}
 void readWav(const char *filename, double **data, int *length) {
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -283,34 +278,33 @@ int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
         exit(-1);
     }
 
-    // Read WAV files
+    
     double *inputSignal, *IRsignal;
     int inputLength, IRlength;
     readWav(sampleTone, &inputSignal, &inputLength);
     readWav(impulseTone, &IRsignal, &IRlength);
 
-    // Pad signals to the next power of 2
+    // size needed for fft
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);
     // int K = next_power_of_2(2*M);
     double *x = (double *)calloc(K*2, sizeof(double));
     double *h = (double *)calloc(K*2, sizeof(double));
 
-    for(int i=0; i< 2*M; i++)
+    for(int i=0; i< inputLength; i++)
     {
-        x[i] = 0.0;
+        x[2*i] = inputSignal[i]; // real part
+        x[2*i + 1] = 0.0; // initially imaginary is 0
+    }
+    for(int i=0; i< IRlength; i++)
+    {
+        h[2*i] = IRsignal[i]; // real part
+        h[2*i + 1] = 0.0; // initially imaginary is 0
     }
 
-    int N = sizeof(h);
-
-    for(int i=0; i< 2*N; i++)
-    {
-        h[i] = 0.0;
-    }
-
-        // pad zeros
-    pad_zeros_to(x, 2*M, K*2);
-    pad_zeros_to(h, 2*N, K*2);
+    // pad zeros
+    pad_zeros_to(x, 2*inputLength, K*2);
+    pad_zeros_to(h, 2*IRlength, K*2);
 
     // FFT
     four1(x-1, K, 1);
@@ -323,17 +317,22 @@ int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
     // Inverse FFT
     four1(y-1, K, -1);
 
-    for(int k = 0, i=0; k<M+N-1; k++, i += 2)
+    for(int i=0; i < K*2; i += 2)
     {
-        y[i] /= (double)K;
-        y[i+1] /= (double)K;
+        y[i] /= (double)K; // only real is reqd since imaginary is 0
     }
 
     for (int i = 0; i < 2*K; i=i+2) {
         printf("%f ", y[i]);
     }
     // Write to output WAV file
-    writeWaveFileHeader(&inputHeader, outputFile);
+    WavHeader inputHeader;
+    int numChannels = inputHeader.numChannels;
+    int bitsPerSample = inputHeader.bitsPerSample;
+    int outputRate = inputHeader.sampleRate;
+
+    writeWAVHeader(numChannels, M, outputRate, bitsPerSample , outputFile);
+
     fwrite(y, sizeof(double), K, outputFile);
 
     // Clean up
