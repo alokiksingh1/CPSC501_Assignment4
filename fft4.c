@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
     
     
     // Reading WAV header
+    
     size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
     size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
     
@@ -281,16 +282,11 @@ int main(int argc, char *argv[]) {
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);   // K is length of input signal
-    // int K = next_power_of_2(2*M);
-    double *inputSignal = (double *)malloc(2 * K * sizeof(double));
-    double *IRsignal = (double *)malloc(2 * K * sizeof(double));
+  
+    double *inputSignal = (double *)calloc(2 * K , sizeof(double));
+    double *IRsignal = (double *)calloc(2 * K , sizeof(double));
 
-    // for (int i = 0; i < 2 * K; i++) {
-    //     inputSignal[i] = 0.0;
-    // }
-    // for (int i = 0; i < 2 * K; i++) {
-    //     IRsignal[i] = 0.0;
-    // }
+    
 
     printf("K: %d\n", K);
     printf("M: %d\n", M);
@@ -320,39 +316,43 @@ int main(int argc, char *argv[]) {
     printf("inputSignal[0]: %f\n", inputSignal[0]);
     printf("IRsignal[0]: %f\n", IRsignal[0]);
     // pad zeros
+
+    
     short tempSample;
-    for (int i = 0; i < inputLength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
-            inputSignal[2 * i] = (double)tempSample/32767.0;
-            inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading input file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+    int maxLength = (inputLength > IRlength) ? inputLength : IRlength;
+
+    for (int i = 0; i < maxLength; i++) {
+        if (i < inputLength) {
+            if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
+                inputSignal[2 * i] = (double)tempSample / 32767.0;
+                // imaginary part is zero by calloc
+            } else {
+                fprintf(stderr, "Error reading input file\n");
+                fclose(inputFile);
+                fclose(IRfile);
+                free(inputSignal);
+                free(IRsignal);
+                return -1;
+            }
         }
-    }
-    for (int i = 0; i < IRlength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
-            IRsignal[2 * i] = (double)tempSample/32767.0;
-            IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading IR file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+
+        if (i < IRlength) {
+            if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
+                IRsignal[2 * i] = (double)tempSample / 32767.0;
+                // imaginary part is zero by calloc
+            } else {
+                fprintf(stderr, "Error reading IR file\n");
+                fclose(inputFile);
+                fclose(IRfile);
+                free(inputSignal);
+                free(IRsignal);
+                return -1;
+            }
         }
     }
 
     pad_zeros_to(inputSignal, 2*inputLength, 2*K);
     pad_zeros_to(IRsignal, 2*IRlength, 2*K);
-    
-    
-    
 
     
 
