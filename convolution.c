@@ -58,7 +58,7 @@ void writeWaveFileHeader(int numChannels, int numberSamples, double outputRate, 
 	
     int formSize = 36 + dataChunkSize;
     short int frameSize = numChannels * BYTES_PER_SAMPLE;
-    int bytesPerSecond = (int)ceil(outputRate * frameSize);
+    int bytesPerSecond = (int)(outputRate * frameSize);
 
   
     fputs("RIFF", outputFile);
@@ -282,11 +282,11 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     for (int i = 0; i < outputSize; ++i) {
         // Convert h[i] from float to short
-        short int s = (short)rint(h[i] * 32767.0);
+        short int s = (short)(h[i] * 32768.0);
         fwrite(&s, sizeof(short), 1, outputFile);
     }
     //fwrite(h, sizeof(float), outputSize, outputFile);
-    fwrite(h, outputSize, 1, outputFile);
+    //fwrite(h, outputSize, 1, outputFile);
 
     
     
