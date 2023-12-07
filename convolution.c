@@ -2,16 +2,6 @@
 #include <stdio.h>
 #include <math.h>
 
-
-/*  CONSTANTS  ***************************************************************/
-#define PI                3.14159265358979
-
-/*  Standard sample rate in Hz  */
-#define SAMPLE_RATE       44100.0
-
-/*  Number of channels  */
-#define MONOPHONIC        1
-
 // struct to hold all data up until the end of subchunk1
 typedef struct {
     char chunk_ID[4];           // "RIFF"
@@ -29,7 +19,6 @@ typedef struct {
 
 // function definition
 void convolve(float x[], int N, float h[], int M, float y[], int P);
-// void readWaveFileHeader(WavHeader *header, FILE *inputFile);
 float bytesToFloat(char firstByte, char secondByte);
 void readTone(char *sampleTone, char *impulseTone, char *outputTone);
 size_t fwriteShortLSB(short int data, FILE *stream);
@@ -143,9 +132,6 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
     }
 
     
-   
-    // fscanf(inputFile, "%s", inputFile); // fscanf is used to read the input file
-    // fscanf(IRfile, "%s", IRfile); // fscanf to read IR file
     WavHeader inputHeader, IRheader;
     // read header subchunk 1
     fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
@@ -176,9 +162,7 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     int num_samples = subchunk2_size_sample / (inputHeader.bitsPerSample / 8); // number of data points in the sample
     int num_impulse = subchunk2_size_impulse / (IRheader.bitsPerSample / 8); // number of data points in the impulse
-    // frequency = 1 / (duration / numberOfSamples)
-    // duration = numberOfSamples / frequency
-    // numberOfSamples = duration * SAMPLE_RATE
+   
     
 
     
@@ -230,7 +214,6 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         y[i] = bytesToFloat(buffer[0], buffer[1]);
     }
 
-    // convolve(x, subchunk2_size_sample, y, subchunk2_size_impulse, h, outputSize);
 
     convolve(x, num_samples, y, num_impulse, h, outputSize);
 
@@ -262,12 +245,6 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
         h[i] /= maxVal;
     }
 
-    // Check for division by zero because h/maxVal cannot afford maxVal to be 0
-    
-    // Normalize h to range -1 to 1
-    // for (int i = 0; i < outputSize; i++) {
-    //     h[i] /= maxVal;
-    // }
 
     int numChannels =inputHeader.numChannels;
     int outputRate = inputHeader.sampleRate;
