@@ -212,14 +212,9 @@ int main(int argc, char *argv[]) {
 
     WavHeader inputHeader, IRheader;
     
-    
     // Reading WAV header
-    size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
-    size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
     
-    
-
-    if (inputRead < 1 || IRread < 1) {
+    if (fread(&inputHeader, sizeof(WavHeader), 1, inputFile) < 1 || fread(&IRheader, sizeof(WavHeader), 1, IRfile) < 1) {
         perror("Error reading WAV header");
         fclose(inputFile);
         fclose(IRfile);
@@ -281,16 +276,11 @@ int main(int argc, char *argv[]) {
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);   // K is length of input signal
-    // int K = next_power_of_2(2*M);
+
     double *inputSignal = (double *)malloc(2 * K * sizeof(double));
     double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
-    // for (int i = 0; i < 2 * K; i++) {
-    //     inputSignal[i] = 0.0;
-    // }
-    // for (int i = 0; i < 2 * K; i++) {
-    //     IRsignal[i] = 0.0;
-    // }
+    
 
     printf("K: %d\n", K);
     printf("M: %d\n", M);

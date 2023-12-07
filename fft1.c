@@ -281,9 +281,19 @@ int main(int argc, char *argv[]) {
     // M is length of output signal
     int M = inputLength + IRlength - 1; 
     int K = next_power_of_2(M);   // K is length of input signal
-    double *inputSignal = (double *)calloc(2 * K,  sizeof(double));
-    double *IRsignal = (double *)calloc(2 * K,  sizeof(double));
+    // int K = next_power_of_2(2*M);
+    double *inputSignal = (double *)malloc(2 * K * sizeof(double));
+    double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
+    // for (int i = 0; i < 2 * K; i++) {
+    //     inputSignal[i] = 0.0;
+    // }
+    // for (int i = 0; i < 2 * K; i++) {
+    //     IRsignal[i] = 0.0;
+    // }
+
+    printf("K: %d\n", K);
+    printf("M: %d\n", M);
     
 
     if (!inputSignal || !IRsignal) {
@@ -352,8 +362,10 @@ int main(int argc, char *argv[]) {
     four1(IRsignal-1, K, 1);
 
     // Convolution
-    double *outputSignal = (double *)calloc(2*K, sizeof(double));
-    
+    double *outputSignal = (double *)malloc(2*K * sizeof(double));
+    for (int i = 0; i < 2 * M; i++) {
+        outputSignal[i] = 0.0;
+    }
 
 
     printf("\nConvolving...\n");

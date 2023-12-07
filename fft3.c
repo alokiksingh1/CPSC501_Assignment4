@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
     
     
     // Reading WAV header
+    
     size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
     size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
     
@@ -320,39 +321,43 @@ int main(int argc, char *argv[]) {
     printf("inputSignal[0]: %f\n", inputSignal[0]);
     printf("IRsignal[0]: %f\n", IRsignal[0]);
     // pad zeros
+
+    
     short tempSample;
-    for (int i = 0; i < inputLength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
-            inputSignal[2 * i] = (double)tempSample/32767.0;
-            inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading input file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+    int maxLength = (inputLength > IRlength) ? inputLength : IRlength;
+
+    for (int i = 0; i < maxLength; i++) {
+        if (i < inputLength) {
+            if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
+                inputSignal[2 * i] = (double)tempSample / 32767.0;
+                inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
+            } else {
+                fprintf(stderr, "Error reading input file\n");
+                fclose(inputFile);
+                fclose(IRfile);
+                free(inputSignal);
+                free(IRsignal);
+                return -1;
+            }
         }
-    }
-    for (int i = 0; i < IRlength; i++) {
-        if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
-            IRsignal[2 * i] = (double)tempSample/32767.0;
-            IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
-        } else {
-            fprintf(stderr, "Error reading IR file\n");
-            fclose(inputFile);
-            fclose(IRfile);
-            free(inputSignal);
-            free(IRsignal);
-            return -1;
+
+        if (i < IRlength) {
+            if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
+                IRsignal[2 * i] = (double)tempSample / 32767.0;
+                IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
+            } else {
+                fprintf(stderr, "Error reading IR file\n");
+                fclose(inputFile);
+                fclose(IRfile);
+                free(inputSignal);
+                free(IRsignal);
+                return -1;
+            }
         }
     }
 
     pad_zeros_to(inputSignal, 2*inputLength, 2*K);
     pad_zeros_to(IRsignal, 2*IRlength, 2*K);
-    
-    
-    
 
     
 
