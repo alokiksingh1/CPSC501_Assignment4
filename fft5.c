@@ -288,8 +288,8 @@ int main(int argc, char *argv[]) {
 
     double inverseofK = 1.0 / (double)K;
  
-    double *inputSignal = (double *)malloc(2 * K * sizeof(double));
-    double *IRsignal = (double *)malloc(2 * K * sizeof(double));
+    double *inputSignal = (double *)calloc(2 * K , sizeof(double));
+    double *IRsignal = (double *)calloc(2 * K , sizeof(double));
 
     
 
@@ -311,11 +311,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < inputLength; i++) {
         inputSignal[2 * i] = inputSignal[i]; // real part
-        inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
+        // imaginary part is zero
     }
     for (int i = 0; i < IRlength; i++) {
         IRsignal[2 * i] = IRsignal[i]; // real part
-        IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
+        // imaginary part is zero
     }
 
     printf("inputSignal[0]: %f\n", inputSignal[0]);
@@ -327,21 +327,31 @@ int main(int argc, char *argv[]) {
     short tempSampleBuffer[BUFFER_SIZE];    
 
     // Reading from inputFile
-    int maxSamples = (inputLength > IRlength) ? inputLength : IRlength;
-    for (int i = 0; i < maxSamples; i += BUFFER_SIZE) {
-        int readCount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, inputFile);
-        for (int j = 0; j < readCount; ++j) {
-            int idx = i + j;
-            if (idx < inputLength) {
-                inputSignal[2 * idx] = (double)tempSampleBuffer[j] * inverseofN;
-            }
+    short tempSample;
+    for (int i = 0; i < inputLength; i++) {
+        if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
+            inputSignal[2 * i] = (double)tempSample * inverseofN;
+            // imaginary part is zero
+        } else {
+            fprintf(stderr, "Error reading input file\n");
+            fclose(inputFile);
+            fclose(IRfile);
+            free(inputSignal);
+            free(IRsignal);
+            return -1;
         }
-        int IRcount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, IRfile);
-        for (int j = 0; j < IRcount; ++j) {
-            int idx = i + j;
-            if (idx < IRlength) {
-                IRsignal[2 * idx] = (double)tempSampleBuffer[j] * inverseofN;
-            }
+    }
+    for (int i = 0; i < IRlength; i++) {
+        if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
+            IRsignal[2 * i] = (double)tempSample * inverseofN;
+            // imaginary part is zero
+        } else {
+            fprintf(stderr, "Error reading IR file\n");
+            fclose(inputFile);
+            fclose(IRfile);
+            free(inputSignal);
+            free(IRsignal);
+            return -1;
         }
     }
 
