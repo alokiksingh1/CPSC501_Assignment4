@@ -354,11 +354,12 @@ int main(int argc, char *argv[]) {
     pad_zeros_to(inputSignal, 2*inputLength, 2*K);
     pad_zeros_to(IRsignal, 2*IRlength, 2*K);
     
-    printf("ERR");
+    
     
 
     
 
+    printf("\nFFT...\n");
     // FFT
     four1(inputSignal-1, K, 1);
     four1(IRsignal-1, K, 1);
@@ -370,8 +371,10 @@ int main(int argc, char *argv[]) {
     }
 
 
+    printf("\nConvolving...\n");
     convolution(inputSignal, M, IRsignal, outputSignal);
  
+    
     printf("inputHeader.numChannels: %d\n", inputHeader.numChannels);
     // Inverse FFT
     four1(outputSignal-1, K, -1);
@@ -408,6 +411,7 @@ int main(int argc, char *argv[]) {
         fwriteShortLSB(sample, outputFile);
     }
     
+    printf("\nOutput written to %s\n", outputTone);
 
     // Clean up
     free(inputSignal);
