@@ -282,12 +282,9 @@ void readTone(char *sampleTone, char *impulseTone, char *outputTone){
 
     for (int i = 0; i < outputSize; ++i) {
         // Convert h[i] from float to short
-        short int s = (short)(h[i] * 32768.0);
+        short int s = (short)(h[i] * 3276.0);
         fwrite(&s, sizeof(short), 1, outputFile);
     }
-    //fwrite(h, sizeof(float), outputSize, outputFile);
-    //fwrite(h, outputSize, 1, outputFile);
-
     
     
 
