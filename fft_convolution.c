@@ -21,8 +21,8 @@ typedef struct {
     int byteRate;              // == SampleRate * NumChannels * BitsPerSample/8
     short blockAlign;          // == NumChannels * BitsPerSample/8
     short bitsPerSample;       // 8 bits = 8, 16 bits = 16, etc.
-    char subChunk2ID[4];
-    int subChunk2Size;
+    // char subChunk2ID[4];
+    // int subChunk2Size;
 } WavHeader;
 
 // function declaration
@@ -34,9 +34,7 @@ void four1(double data[], int nn, int isign);
 void reverse_array(double *arr, int length);
 int next_power_of_2(int n);
 void convolution(double *x, int K, double *h, double *y) ;
-void readWav(const char* filename, double** signal, int* length, WavHeader* header);
-void readIR(const char* filename, double** IRsignal, int* IRlength, WavHeader* header);
-int convolveTone(char* sampleTone, char* impulseTone, char* outputTone);
+int readLittleEndianInt(FILE *file);
 
 // Function to pad zeros to the input array to make its length M
 void pad_zeros_to(double *arr, int current_length, int M) {
@@ -189,239 +187,212 @@ void convolution(double *x, int K, double *h, double *y) {
     }
 
 
-int main (int argc, char *argv[]){
-
-    char *inputFile, *IRfile, *outputFile;
-
-    if (argc != 4){
-        fprintf(stderr, "Usage : %s \t3 arguments required: (input file) (IR file) (output file)\n", argv[0]);
-        exit(-1);
-    }
-
-    inputFile = argv[1];
-    IRfile = argv[2];
-    outputFile = argv[3];
-
-    convolveTone(inputFile, IRfile, outputFile);
-
+int main(int argc, char *argv[]) {
     
-    return 0;
-}
-
-
-// void readWav(const char* filename, double** inputSignal, double** IRsignal, int* inputLength, int* IRlength, WavHeader* header) {
-//     FILE* file = fopen(filename, "rb");
-//     if (file == NULL) {
-//         perror("Error opening file");
-//         exit(-1);
-//     }
-
-//     // Reading WAV header
-//     if (fread(header, sizeof(WavHeader), 1, file) < 1) {
-//         perror("Error reading WAV header");
-//         fclose(file);
-//         exit(-1);
-//     }
-
-//     // Validate that format is PCM and there is only one channel (Mono)
-//     if (header->audioFormat != 1 || header->numChannels != 1) {
-//         fprintf(stderr, "Unsupported WAV format or not mono.\n");
-//         fclose(file);
-//         exit(-1);
-//     }
-
-//     // Calculate total number of samples
-//     int totalSamples = header->subChunk2Size / (header->bitsPerSample / 8);
-
-//     // Allocate memory for inputSignal and IRsignal
-//     *inputSignal = (double*)calloc(totalSamples, sizeof(double));
-//     *IRsignal = (double*)calloc(totalSamples, sizeof(double));
-
-//     if (*inputSignal == NULL || *IRsignal == NULL) {
-//         perror("Error allocating memory for audio data");
-//         fclose(file);
-//         exit(-1);
-//     }
-
-//     // Temporary buffer for reading samples
-//     short tempBuffer;
-//     int sampleCount = 0;
-
-//     while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
-//         // Assuming the first half of the file is input signal and the second half is IR
-//         if (sampleCount < totalSamples / 2) {
-//             (*inputSignal)[sampleCount] = (double)tempBuffer;
-//         } else {
-//             (*IRsignal)[sampleCount - totalSamples / 2] = (double)tempBuffer;
-//         }
-//         sampleCount++;
-//     }
-
-//     *inputLength = totalSamples / 2;
-//     *IRlength = totalSamples / 2;
-
-//     fclose(file);
-// }
-
-void readWav(const char* filename, double** signal, int* length, WavHeader* header) {
-    FILE* file = fopen(filename, "rb");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
+    char *sampleTone, *impulseTone, *outputTone;
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <input_wave_file> <impulse_response_wave_file> <output_wave_file>\n", argv[0]);
+        return -1;
     }
 
-    // Reading WAV header
-    if (fread(header, sizeof(WavHeader), 1, file) < 1) {
-        perror("Error reading WAV header");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
+    sampleTone = argv[1];
+    impulseTone = argv[2];
+    outputTone = argv[3];
 
-    // Validate that format is PCM and there is only one channel (Mono)
-    if (header->audioFormat != 1 || header->numChannels != 1) {
-        fprintf(stderr, "Unsupported WAV format or not mono.\n");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // Calculate total number of samples
-    int total_length = header->subChunk2Size / (header->bitsPerSample / 8);
-
-    // Allocate memory for the signal
-    *signal = (double*)calloc(*length, sizeof(double));
-    if (*signal == NULL) {
-        perror("Error allocating memory for audio data");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // Temporary buffer for reading samples
-    short tempBuffer;
-    int sampleCount = 0;
-
-    while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
-        (*signal)[sampleCount] = (double)tempBuffer;
-        sampleCount++;
-    }
-
-    fclose(file);
-}
-
-
-
-void readIR(const char* filename, double** IRsignal, int* IRlength, WavHeader* header) {
-    FILE* file = fopen(filename, "rb");
-    if (file == NULL) {
-        perror("Error opening IR file");
-        exit(EXIT_FAILURE);
-    }
-
-    // Reading WAV header
-    if (fread(header, sizeof(WavHeader), 1, file) < 1) {
-        perror("Error reading IR WAV header");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // Validate that format is PCM and there is only one channel (Mono)
-    if (header->audioFormat != 1 || header->numChannels != 1) {
-        fprintf(stderr, "Unsupported IR WAV format or not mono.\n");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // Calculate total number of samples in the IR file
-    *IRlength = header->subChunk2Size / (header->bitsPerSample / 8);
-
-    // Allocate memory for the IR signal
-    *IRsignal = (double*)calloc(*IRlength, sizeof(double));
-    if (*IRsignal == NULL) {
-        perror("Error allocating memory for IR audio data");
-        fclose(file);
-        exit(EXIT_FAILURE);
-    }
-
-    // Temporary buffer for reading IR samples
-    short tempBuffer;
-    int sampleCount = 0;
-
-    while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
-        (*IRsignal)[sampleCount] = (double)tempBuffer;
-        sampleCount++;
-    }
-
-    fclose(file);
-}
-
-
-int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
     FILE *inputFile = fopen(sampleTone, "rb");
     FILE *IRfile = fopen(impulseTone, "rb");
+    printf("inputFile: %s\n", sampleTone);
+    printf("IRfile: %s\n", impulseTone);
     //FILE *outputFile = fopen(outputTone, "wb");
 
     if (inputFile == NULL){
         printf("Couldn't load input file, Error!!\n");
         perror("");
-        exit(-1);
+        return -1;
     }
     if (IRfile == NULL){
         printf("Couldn't load IR file, Error!!\n");
         perror("");
-        exit(-1);
+        return -1;
     }
     
-
-    
-    double *inputSignal, *IRsignal;
-    int inputLength, IRlength;
 
     WavHeader inputHeader, IRheader;
     
+    
+    // Reading WAV header
+    //size_t inputRead = fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
+    size_t inputRead = fread(&inputHeader, 1, sizeof(WavHeader) - sizeof(int), inputFile); // Exclude subChunk2Size
+    //inputHeader.subChunk2Size = readLittleEndianInt(inputFile);
 
-    readWav(sampleTone, &inputSignal, &inputLength, &inputHeader);
-    readIR(impulseTone, &IRsignal, &IRlength, &IRheader);
+    //size_t IRread = fread(&IRheader, sizeof(WavHeader), 1, IRfile);
+    size_t IRread = fread(&IRheader, 1, sizeof(WavHeader) - sizeof(int), IRfile); // Exclude subChunk2Size
+    //IRheader.subChunk2Size = readLittleEndianInt(IRfile);
 
-    // size needed for fft
+    if (inputRead < 1 || IRread < 1) {
+        perror("Error reading WAV header");
+        fclose(inputFile);
+        fclose(IRfile);
+        return -1;
+    }
+    if (inputHeader.subchunk1_Size != 16){
+        // eliminate null bytes
+        int remainder = inputHeader.subchunk1_Size - 16;
+        char randomVar[remainder];
+        fread(randomVar, remainder  , 1, inputFile);
+    }
+
+    if (IRheader.subchunk1_Size != 16){
+        // eliminate null bytes
+        int remainder = IRheader.subchunk1_Size - 16;
+        char randomVar[remainder];
+        fread(randomVar, remainder  , 1, IRfile);
+    }
+
+    char subchunk2_id_sample[4];
+    char subchunk2_id_impulse[4];
+    int subchunk2_size_sample; // an integer is 4 bytes
+    int subchunk2_size_impulse; // an integer is 4 bytes
+    fread(&subchunk2_id_sample, sizeof(subchunk2_id_sample), 1, inputFile);
+    fread(&subchunk2_size_sample, sizeof(subchunk2_size_sample), 1, inputFile);
+    fread(&subchunk2_id_impulse, sizeof(subchunk2_id_impulse), 1, IRfile);
+    fread(&subchunk2_size_impulse, sizeof(subchunk2_size_impulse), 1, IRfile);
+
+    int num_samples = subchunk2_size_sample / (inputHeader.bitsPerSample / 8); // number of data points in the sample
+    int num_impulse = subchunk2_size_impulse / (IRheader.bitsPerSample / 8); // number of data points in the impulse
+    
+
+
+    int inputLength = subchunk2_size_sample / (inputHeader.bitsPerSample / 8);
+    int IRlength = subchunk2_size_impulse / (IRheader.bitsPerSample / 8);
+
+    // After reading the WAV header
+    printf("Chunk Size: %d, Format: %s\n", inputHeader.chunk_Size, inputHeader.format);
+    printf("Subchunk1 Size: %d, Audio Format: %d\n", inputHeader.subchunk1_Size, inputHeader.audioFormat);
+    printf("Byte Rate: %d, Block Align: %d\n", inputHeader.byteRate, inputHeader.blockAlign);
+    printf("Sub Chunk 2 Size: %d\n", subchunk2_size_sample);
+
+    // After reading the WAV header
+    printf("IR Chunk Size: %d, Format: %s\n", IRheader.chunk_Size, IRheader.format);
+    printf("IR Subchunk1 Size: %d, Audio Format: %d\n", IRheader.subchunk1_Size, IRheader.audioFormat);
+    printf("IR Byte Rate: %d, Block Align: %d\n", IRheader.byteRate, IRheader.blockAlign);
+    printf("IR Sub Chunk 2 Size: %d\n", subchunk2_size_impulse);
+
+
+
+    // Add a check for negative lengths
+    if (inputLength < 0 || IRlength < 0) {
+        fprintf(stderr, "Error: Negative length found in WAV headers.\n");
+        fclose(inputFile);
+        fclose(IRfile);
+        return -1;
+    }
+
+    printf("inputLength: %d\n", inputLength);
+    printf("IRlength: %d\n", IRlength);
+
+    // M is length of output signal
     int M = inputLength + IRlength - 1; 
-    int K = next_power_of_2(M);
+    int K = next_power_of_2(2*M);   // K is length of input signal
     // int K = next_power_of_2(2*M);
-    double *x = (double *)calloc(K*2, sizeof(double));
-    double *h = (double *)calloc(K*2, sizeof(double));
+    double *inputSignal = (double *)malloc(2 * K * sizeof(double));
+    double *IRsignal = (double *)malloc(2 * K * sizeof(double));
 
-    for(int i=0; i< inputLength; i++)
-    {
-        x[2*i] = inputSignal[i]; // real part
-        x[2*i + 1] = 0.0; // initially imaginary is 0
+    for (int i = 0; i < 2 * K; i++) {
+        inputSignal[i] = 0.0;
     }
-    for(int i=0; i< IRlength; i++)
-    {
-        h[2*i] = IRsignal[i]; // real part
-        h[2*i + 1] = 0.0; // initially imaginary is 0
+    for (int i = 0; i < 2 * K; i++) {
+        IRsignal[i] = 0.0;
     }
 
+    printf("K: %d\n", K);
+    printf("M: %d\n", M);
+    
+
+    if (!inputSignal || !IRsignal) {
+        perror("Error allocating memory for audio data");
+        fclose(inputFile);
+        fclose(IRfile);
+        if (inputSignal) 
+            free(inputSignal);
+        if (IRsignal) 
+            free(IRsignal);
+        return -1;
+    }
+
+
+    for (int i = 0; i < inputLength; i++) {
+        inputSignal[2 * i] = inputSignal[i]; // real part
+        inputSignal[2 * i + 1] = 0.0; // imaginary part
+    }
+    for (int i = 0; i < IRlength; i++) {
+        IRsignal[2 * i] = IRsignal[i]; // real part
+        IRsignal[2 * i + 1] = 0.0; // imaginary part
+    }
+
+    printf("inputSignal[0]: %f\n", inputSignal[0]);
+    printf("IRsignal[0]: %f\n", IRsignal[0]);
     // pad zeros
-    pad_zeros_to(x, 2*inputLength, K*2);
-    pad_zeros_to(h, 2*IRlength, K*2);
+    short tempSample;
+    for (int i = 0; i < inputLength; i++) {
+        if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
+            inputSignal[2 * i] = (double)tempSample/32767.0;
+            inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
+        } else {
+            fprintf(stderr, "Error reading input file\n");
+            fclose(inputFile);
+            fclose(IRfile);
+            free(inputSignal);
+            free(IRsignal);
+            return -1;
+        }
+    }
+    for (int i = 0; i < IRlength; i++) {
+        if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
+            IRsignal[2 * i] = (double)tempSample/32767.0;
+            IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
+        } else {
+            fprintf(stderr, "Error reading IR file\n");
+            fclose(inputFile);
+            fclose(IRfile);
+            free(inputSignal);
+            free(IRsignal);
+            return -1;
+        }
+    }
+
+    pad_zeros_to(inputSignal, 2*inputLength, 2*K);
+    pad_zeros_to(IRsignal, 2*IRlength, 2*K);
+    
+    printf("ERR");
+    
+
+    
 
     // FFT
-    four1(x-1, K, 1);
-    four1(h-1, K, 1);
+    four1(inputSignal-1, K, 1);
+    four1(IRsignal-1, K, 1);
 
     // Convolution
-    double *y = (double *)calloc(K*2, sizeof(double));
-    convolution(x, K, h, y);
+    double *outputSignal = (double *)malloc(2*K * sizeof(double));
+    for (int i = 0; i < 2 * M; i++) {
+        outputSignal[i] = 0.0;
+    }
 
+
+    convolution(inputSignal, M, IRsignal, outputSignal);
+ 
+    printf("inputHeader.numChannels: %d\n", inputHeader.numChannels);
     // Inverse FFT
-    four1(y-1, K, -1);
+    four1(outputSignal-1, K, -1);
+  
 
-    for(int i=0; i < K*2; i += 2)
+    for(int i=0; i < M; i++)
     {
-        y[i] /= (double)K; // only real is reqd since imaginary is 0
+        outputSignal[2*i] /= (double)K; 
+        outputSignal[2*i+1] /= (double)K;
     }
 
-    for (int i = 0; i < 2*K; i=i+2) {
-        printf("%f ", y[i]);
-    }
 
     int numChannels = inputHeader.numChannels;
     int bitsPerSample = inputHeader.bitsPerSample;
@@ -433,24 +404,25 @@ int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
         printf("Couldn't load ouput file, Error!!\n");
         perror("");
         fclose(inputFile);
+        fclose(IRfile);
         free(inputSignal);
         free(IRsignal);
+        free(outputSignal);
         exit(-1);
     }
 
     writeWAVHeader(numChannels, M, outputRate, bitsPerSample , outputFile);
 
-    for (int i = 0; i < K; i++) {
-        short int sample = (short int)(y[2 * i] * 32767.0); // Convert double to 16-bit sample
+    for (int i = 0; i < M; i++) {
+        short int sample = (short int)(outputSignal[2 * i] * 32767.0); // Convert double to 16-bit sample
         fwriteShortLSB(sample, outputFile);
     }
+    
 
     // Clean up
     free(inputSignal);
     free(IRsignal);
-    free(x);
-    free(h);
-    free(y);
+    free(outputSignal);
 
     fclose(inputFile);
     fclose(IRfile);
@@ -464,3 +436,65 @@ int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
 
 //  now extract real part into imaginary array, imaginary part will be 0. calculate properly
 
+// Temporary buffer for reading samples
+    // short Buffer, IRBuffer;
+    // int sampleCount = 0;
+    // short tempBuffer;
+
+
+    // while (fread(&tempBuffer, sizeof(short), 1, inputFile) == 1){
+    //     while (fread(&tempBuffer, sizeof(short), 1, IRfile) == 1) {
+    //         // Assuming the first half of the file is input signal and the second half is IR
+    //         if (sampleCount < inputLength / 2) {
+    //             (inputSignal)[sampleCount] = (double)tempBuffer;
+    //         } else {
+    //             (IRsignal)[sampleCount - inputLength / 2] = (double)tempBuffer;
+    //         }
+    //         sampleCount++;
+    //     }
+    // }
+
+    // for (int i = 0; i < inputLength; i++) {
+
+    //     if(fread(&Buffer, sizeof(short), 1, inputFile) != 1){
+    //         printf("Error reading input file\n");
+    //         fclose(inputFile);
+    //         fclose(IRfile);
+    //         free(inputSignal);
+    //         free(IRsignal);
+    //         return -1;
+    //     }
+    //     inputSignal[i] = (double)Buffer/32767.0;
+    // }
+    // for (int i = 0; i < IRlength; i++) {
+    //     if(fread(&IRBuffer, sizeof(short), 1, IRfile) != 1){
+    //         printf("Error reading IR file\n");
+    //         fclose(inputFile);
+    //         fclose(IRfile);
+    //         free(inputSignal);
+    //         free(IRsignal);
+    //         return -1;
+    //     }
+    //     IRsignal[i] = (double)IRBuffer/32767.0;
+    // }
+
+// after padzero
+// for(int i=0; i< inputLength; --i)
+    // {
+    //     inputSignal[2*i] = inputSignal[i]; // real part
+    //     inputSignal[2*i + 1] = 0.0; //  imaginary is 0
+    // }
+    
+    // for(int i=0; i< IRlength; --i)
+    // {
+    //     IRsignal[2*i] = IRsignal[i]; // real part
+    //     IRsignal[2*i + 1] = 0.0; //  imaginary is 0
+    // }
+
+int readLittleEndianInt(FILE *file) {
+    unsigned char buffer[4];
+    if (fread(buffer, sizeof(unsigned char), 4, file) != 4) {
+        return -1; // or other error handling
+    }
+    return buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24);
+}
