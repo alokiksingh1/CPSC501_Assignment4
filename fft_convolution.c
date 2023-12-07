@@ -34,7 +34,8 @@ void four1(double data[], int nn, int isign);
 void reverse_array(double *arr, int length);
 int next_power_of_2(int n);
 void convolution(double *x, int K, double *h, double *y) ;
-void readWav(double **data, int *length, WavHeader *header, FILE *file);
+void readWav(const char* filename, double** signal, int* length, WavHeader* header);
+void readIR(const char* filename, double** IRsignal, int* IRlength, WavHeader* header);
 int convolveTone(char* sampleTone, char* impulseTone, char* outputTone);
 
 // Function to pad zeros to the input array to make its length M
@@ -208,50 +209,149 @@ int main (int argc, char *argv[]){
 }
 
 
-void readWav(double **data, int *length, WavHeader *header, FILE *file) {
-    // Read the header
+// void readWav(const char* filename, double** inputSignal, double** IRsignal, int* inputLength, int* IRlength, WavHeader* header) {
+//     FILE* file = fopen(filename, "rb");
+//     if (file == NULL) {
+//         perror("Error opening file");
+//         exit(-1);
+//     }
 
-    fread(header, sizeof(WavHeader), 1, file);
+//     // Reading WAV header
+//     if (fread(header, sizeof(WavHeader), 1, file) < 1) {
+//         perror("Error reading WAV header");
+//         fclose(file);
+//         exit(-1);
+//     }
 
-    // Ensure the WAV file is of the expected format
-    if (header->audioFormat != 1 || header->numChannels != 1 || header->bitsPerSample != 16) {
-        fprintf(stderr, "Unsupported WAV format\n");
-        fclose(file);
-        exit(-1);
+//     // Validate that format is PCM and there is only one channel (Mono)
+//     if (header->audioFormat != 1 || header->numChannels != 1) {
+//         fprintf(stderr, "Unsupported WAV format or not mono.\n");
+//         fclose(file);
+//         exit(-1);
+//     }
+
+//     // Calculate total number of samples
+//     int totalSamples = header->subChunk2Size / (header->bitsPerSample / 8);
+
+//     // Allocate memory for inputSignal and IRsignal
+//     *inputSignal = (double*)calloc(totalSamples, sizeof(double));
+//     *IRsignal = (double*)calloc(totalSamples, sizeof(double));
+
+//     if (*inputSignal == NULL || *IRsignal == NULL) {
+//         perror("Error allocating memory for audio data");
+//         fclose(file);
+//         exit(-1);
+//     }
+
+//     // Temporary buffer for reading samples
+//     short tempBuffer;
+//     int sampleCount = 0;
+
+//     while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
+//         // Assuming the first half of the file is input signal and the second half is IR
+//         if (sampleCount < totalSamples / 2) {
+//             (*inputSignal)[sampleCount] = (double)tempBuffer;
+//         } else {
+//             (*IRsignal)[sampleCount - totalSamples / 2] = (double)tempBuffer;
+//         }
+//         sampleCount++;
+//     }
+
+//     *inputLength = totalSamples / 2;
+//     *IRlength = totalSamples / 2;
+
+//     fclose(file);
+// }
+
+void readWav(const char* filename, double** signal, int* length, WavHeader* header) {
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
     }
 
-    // Calculate the number of samples
-    *length = header->subChunk2Size / (header->numChannels * (header->bitsPerSample / 8));
+    // Reading WAV header
+    if (fread(header, sizeof(WavHeader), 1, file) < 1) {
+        perror("Error reading WAV header");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
 
-    // Allocate memory for the audio data
-    *data = (double *)malloc(*length * sizeof(double));
-    if (*data == NULL) {
+    // Validate that format is PCM and there is only one channel (Mono)
+    if (header->audioFormat != 1 || header->numChannels != 1) {
+        fprintf(stderr, "Unsupported WAV format or not mono.\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+
+    // Calculate total number of samples
+    int total_length = header->subChunk2Size / (header->bitsPerSample / 8);
+
+    // Allocate memory for the signal
+    *signal = (double*)calloc(*length, sizeof(double));
+    if (*signal == NULL) {
         perror("Error allocating memory for audio data");
         fclose(file);
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
-    // Read the audio data and convert to floating point
-    for (int i = 0; i < *length; ++i) {
-        short shortSample;  // random initialization
-        size_t readFile = fread(&shortSample, sizeof(short), 1, file);
-        
-        if (readFile< 1) {
-            perror("Error reading audio data");
-            free(*data);
-            fclose(file);
-            exit(-1);
-        }
-        (*data)[i] = (double)shortSample / 32767.0;
+    // Temporary buffer for reading samples
+    short tempBuffer;
+    int sampleCount = 0;
+
+    while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
+        (*signal)[sampleCount] = (double)tempBuffer;
+        sampleCount++;
     }
-    // for (int i = 0; i < *length; i++) {
-    //     // Normalize 16-bit PCM data to [-1.0, 1.0]
-    //     (*data)[i] = 32767.0;
-    // }
 
     fclose(file);
 }
 
+
+
+void readIR(const char* filename, double** IRsignal, int* IRlength, WavHeader* header) {
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Error opening IR file");
+        exit(EXIT_FAILURE);
+    }
+
+    // Reading WAV header
+    if (fread(header, sizeof(WavHeader), 1, file) < 1) {
+        perror("Error reading IR WAV header");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+
+    // Validate that format is PCM and there is only one channel (Mono)
+    if (header->audioFormat != 1 || header->numChannels != 1) {
+        fprintf(stderr, "Unsupported IR WAV format or not mono.\n");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+
+    // Calculate total number of samples in the IR file
+    *IRlength = header->subChunk2Size / (header->bitsPerSample / 8);
+
+    // Allocate memory for the IR signal
+    *IRsignal = (double*)calloc(*IRlength, sizeof(double));
+    if (*IRsignal == NULL) {
+        perror("Error allocating memory for IR audio data");
+        fclose(file);
+        exit(EXIT_FAILURE);
+    }
+
+    // Temporary buffer for reading IR samples
+    short tempBuffer;
+    int sampleCount = 0;
+
+    while (fread(&tempBuffer, sizeof(short), 1, file) == 1) {
+        (*IRsignal)[sampleCount] = (double)tempBuffer;
+        sampleCount++;
+    }
+
+    fclose(file);
+}
 
 
 int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
@@ -276,15 +376,10 @@ int convolveTone(char* sampleTone, char* impulseTone, char* outputTone) {
     int inputLength, IRlength;
 
     WavHeader inputHeader, IRheader;
-    // fread(&inputHeader, sizeof(WavHeader), 1, inputFile);
-    // fread(&IRheader, sizeof(WavHeader), 1, IRfile);
+    
 
-    printf("Reading input and IR files...\n");
-    readWav(&inputSignal, &inputLength, &inputHeader, inputFile);
-    printf("input length: %d\n", inputLength);
-    printf("IR length: %d\n", IRlength);
-    readWav(&IRsignal, &IRlength, &IRheader, IRfile);
-    printf("IR length: %d\n", IRlength);
+    readWav(sampleTone, &inputSignal, &inputLength, &inputHeader);
+    readIR(impulseTone, &IRsignal, &IRlength, &IRheader);
 
     // size needed for fft
     int M = inputLength + IRlength - 1; 
