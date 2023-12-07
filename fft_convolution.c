@@ -92,9 +92,6 @@ size_t fwriteShortLSB(short int data, FILE *stream)
 }
 
 
-
-
-
 //  The four1 FFT from Numerical Recipes in C,
 //  p. 507 - 508.
 //  Note:  changed float data types to double.
