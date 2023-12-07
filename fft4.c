@@ -318,35 +318,24 @@ int main(int argc, char *argv[]) {
     // pad zeros
 
     
-    short tempSample;
-    int maxLength = (inputLength > IRlength) ? inputLength : IRlength;
+    #define BUFFER_SIZE 1024  // 1 KB buffer
+    short tempSampleBuffer[BUFFER_SIZE];    
 
-    for (int i = 0; i < maxLength; i++) {
-        if (i < inputLength) {
-            if (fread(&tempSample, sizeof(short), 1, inputFile) == 1) {
-                inputSignal[2 * i] = (double)tempSample / 32767.0;
-                inputSignal[2 * i + 1] = 0.0; // imaginary part is zero
-            } else {
-                fprintf(stderr, "Error reading input file\n");
-                fclose(inputFile);
-                fclose(IRfile);
-                free(inputSignal);
-                free(IRsignal);
-                return -1;
+    // Reading from inputFile
+    int maxSamples = (inputLength > IRlength) ? inputLength : IRlength;
+    for (int i = 0; i < maxSamples; i += BUFFER_SIZE) {
+        int readCount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, inputFile);
+        for (int j = 0; j < readCount; ++j) {
+            int idx = i + j;
+            if (idx < inputLength) {
+                inputSignal[2 * idx] = (double)tempSampleBuffer[j] / 32767.0;
             }
         }
-
-        if (i < IRlength) {
-            if (fread(&tempSample, sizeof(short), 1, IRfile) == 1) {
-                IRsignal[2 * i] = (double)tempSample / 32767.0;
-                IRsignal[2 * i + 1] = 0.0; // imaginary part is zero
-            } else {
-                fprintf(stderr, "Error reading IR file\n");
-                fclose(inputFile);
-                fclose(IRfile);
-                free(inputSignal);
-                free(IRsignal);
-                return -1;
+        int IRcount = fread(tempSampleBuffer, sizeof(short), BUFFER_SIZE, IRfile);
+        for (int j = 0; j < IRcount; ++j) {
+            int idx = i + j;
+            if (idx < IRlength) {
+                IRsignal[2 * idx] = (double)tempSampleBuffer[j] / 32767.0;
             }
         }
     }

@@ -306,11 +306,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < inputLength; i++) {
         inputSignal[2 * i] = inputSignal[i]; // real part
-        // imaginary part is zero by calloc
+       // imaginary part is 0 by calloc
     }
     for (int i = 0; i < IRlength; i++) {
         IRsignal[2 * i] = IRsignal[i]; // real part
-        // imaginary part is zero by calloc
+        // imaginary part is 0 by calloc
     }
 
     printf("inputSignal[0]: %f\n", inputSignal[0]);
